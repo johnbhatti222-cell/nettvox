@@ -1,10 +1,12 @@
 <!DOCTYPE html>
 <html>
+<html lang="en">
 <head>
 <base target="_top">
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>ISP Confluence Map</title>
+<title>ISP Demarcation Map</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
@@ -12,10 +14,12 @@
   :root{
     --ink:#16232E; --muted:#5E6E7A; --line:#D9E0E5; --page:#EEF2F5; --panel:#FFFFFF;
     --c1:#2F7EA1; --c2:#E39A0B; --c3:#C62A3B;
+    --ion:#F28C1B; --netcom:#1F66D1; --nettvox:#F4C20D;
   }
   *{box-sizing:border-box}
   html,body{margin:0;height:100%;font-family:'IBM Plex Sans',system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;color:var(--ink);background:var(--page);font-size:14px}
   #app{display:grid;grid-template-columns:400px 1fr;height:100%}
+  #app{display:grid;grid-template-columns:410px 1fr;height:100%}
   #panel{background:var(--panel);border-right:1px solid var(--line);display:flex;flex-direction:column;min-height:0}
   #mapwrap{position:relative;min-height:0;height:100%}
   #map{height:100%;width:100%;background:#dfe6ea}
@@ -25,14 +29,26 @@
   .sub{color:var(--muted);font-size:12.5px}
   nav{display:flex;gap:4px;padding:0 14px;border-bottom:1px solid var(--line)}
   nav button{background:none;border:0;padding:10px 12px;font:inherit;color:var(--muted);cursor:pointer;border-bottom:2px solid transparent;margin-bottom:-1px}
+  nav{display:flex;gap:2px;padding:0 12px;border-bottom:1px solid var(--line);overflow-x:auto}
+  nav button{background:none;border:0;padding:10px 10px;font:inherit;color:var(--muted);cursor:pointer;border-bottom:2px solid transparent;margin-bottom:-1px;white-space:nowrap}
   nav button.on{color:var(--ink);border-bottom-color:var(--ink);font-weight:600}
   nav button:focus-visible,button:focus-visible,select:focus-visible,input:focus-visible{outline:2px solid var(--c1);outline-offset:2px}
+  nav button:focus-visible,button:focus-visible,select:focus-visible,input:focus-visible{outline:2px solid var(--netcom);outline-offset:2px}
   .tab{display:none;overflow:auto;padding:14px 18px 24px;flex:1;min-height:0}
   .tab.on{display:block}
   label.f{display:block;font-size:12px;color:var(--muted);margin:10px 0 4px}
   select,input[type=text]{width:100%;padding:8px 10px;border:1px solid var(--line);border-radius:6px;font:inherit;background:#fff;color:var(--ink)}
+  select,input[type=text],input[type=password]{width:100%;padding:8px 10px;border:1px solid var(--line);border-radius:6px;font:inherit;background:#fff;color:var(--ink)}
+  .two{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+  .seg{display:flex;border:1px solid var(--line);border-radius:7px;overflow:hidden}
+  .seg label{flex:1;text-align:center;padding:7px 6px;cursor:pointer;font-size:12.5px;border-left:1px solid var(--line)}
+  .seg label:first-child{border-left:0}
+  .seg input{position:absolute;opacity:0;pointer-events:none}
+  .seg label:has(input:checked){background:var(--ink);color:#fff}
+  .seg label:has(input:focus-visible){outline:2px solid var(--netcom);outline-offset:-2px}
   .chips{display:flex;gap:6px;flex-wrap:wrap}
   .chip{display:flex;align-items:center;gap:6px;border:1px solid var(--line);border-radius:999px;padding:5px 10px;cursor:pointer;user-select:none}
+  .chip{display:flex;align-items:center;gap:6px;border:1px solid var(--line);border-radius:999px;padding:5px 10px;cursor:pointer;user-select:none;font-size:12.5px}
   .chip input{margin:0}
   .dot{width:11px;height:11px;border-radius:50%;display:inline-block;border:1.5px solid #fff;box-shadow:0 0 0 1px var(--line)}
   .kpis{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:6px 0 14px}
@@ -46,19 +62,48 @@
   .bar .all{position:absolute;inset:0 auto 0 0;border-radius:4px;opacity:.35}
   .bar .shared{position:absolute;inset:0 auto 0 0;border-radius:4px}
   .note{color:var(--muted);font-size:12px;line-height:1.45}
+  .dot{width:12px;height:12px;border-radius:50%;display:inline-block;border:1.5px solid rgba(22,35,46,.55);flex:none}
+  .sq{width:14px;height:14px;border-radius:3px;display:inline-block;flex:none;opacity:.75}
+  h3{font-size:13px;margin:18px 0 8px;font-weight:600}
+  .isp{border:1px solid var(--line);border-left:6px solid;border-radius:8px;padding:9px 12px;margin:8px 0}
+  .isp .hd{display:flex;justify-content:space-between;align-items:baseline;gap:8px}
+  .isp .hd b{font-size:14px}
+  .isp .big{font-size:20px;font-weight:600}
+  .isp .ln{display:flex;justify-content:space-between;font-size:12.5px;color:var(--muted);margin-top:3px}
+  .isp .ln span:last-child{color:var(--ink);font-weight:500}
+  .pos{color:#1E6B45!important}.neg{color:#9B1C2C!important}
+  table.tx{width:100%;border-collapse:collapse;font-size:12.5px}
+  table.tx th{text-align:left;font-weight:500;color:var(--muted);border-bottom:1px solid var(--line);padding:5px 4px}
+  table.tx td{padding:6px 4px;border-bottom:1px solid #EEF1F3}
+  table.tx td.r,table.tx th.r{text-align:right}
+  .note{color:var(--muted);font-size:12px;line-height:1.5}
   ul.list{list-style:none;margin:0;padding:0}
+  ul.list li.bi{display:block;border-bottom:1px solid var(--line)}
   ul.list li{display:flex;gap:10px;align-items:center;padding:9px 6px;border-bottom:1px solid var(--line);cursor:pointer;border-radius:4px}
   ul.list li:hover,ul.list li:focus-visible{background:#F3F6F8;outline:none}
   ul.list .n{flex:1;min-width:0}
   ul.list .n div:first-child{font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
   ul.list .n div:last-child{color:var(--muted);font-size:12px}
   ul.list .tot{font-weight:600}
+  .item{display:flex;gap:10px;align-items:center;padding:9px 6px;cursor:pointer;border-radius:4px}
+  .item:hover,.item:focus-visible{background:#F3F6F8;outline:none}
+  .item .n{flex:1;min-width:0}
+  .item .n div:first-child{font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .item .n .sb{color:var(--muted);font-size:12px}
+  .item .tot{font-weight:600;text-align:right;font-size:12.5px}
+  .tagv{font-size:11px;color:#1E6B45;background:#E8F5EE;padding:1px 7px;border-radius:999px;margin-left:6px;white-space:nowrap}
+  .tagv.auto{color:#4B3A8C;background:#EFEAFB}
+  .tagv.approx{color:#8A5A00;background:#FFF1D6}
+  .tagv.tie{color:#6B2A7A;background:#F6E8FA}
   .btn{background:var(--ink);color:#fff;border:0;border-radius:6px;padding:9px 14px;font:inherit;cursor:pointer}
   .btn.ghost{background:#fff;color:var(--ink);border:1px solid var(--line)}
   .btn[disabled]{opacity:.45;cursor:not-allowed}
   .row{display:flex;gap:8px;flex-wrap:wrap;margin:10px 0}
+  .btn:disabled{opacity:.5;cursor:default}
+  .row{display:flex;gap:8px;flex-wrap:wrap;margin:12px 0 0}
   .drop{border:1.5px dashed #9FB0BB;border-radius:8px;padding:18px;text-align:center;color:var(--muted);cursor:pointer;margin-top:8px}
   .drop.over{background:#F3F8FB;border-color:var(--c1)}
+  .drop.over{background:#F3F8FB;border-color:var(--netcom)}
   .msg{margin-top:12px;padding:10px 12px;border-radius:6px;font-size:12.5px;line-height:1.5}
   .msg.ok{background:#E8F5EE;color:#1E6B45}
   .msg.err{background:#FBEAEC;color:#9B1C2C}
@@ -83,32 +128,42 @@
   .link{background:none;border:0;color:var(--muted);font:inherit;font-size:12px;text-decoration:underline;cursor:pointer;padding:0;margin-top:6px}
   .legend{background:#fff;padding:10px 12px;border-radius:8px;box-shadow:0 1px 6px rgba(0,0,0,.25);font-size:12.5px;line-height:1.7}
   .legend .dot{vertical-align:-1px;margin-right:6px}
+  .legend{background:#fff;padding:10px 12px;border-radius:8px;box-shadow:0 1px 6px rgba(0,0,0,.25);font-size:12.5px;line-height:1.8;max-width:240px}
+  .legend .r{display:flex;align-items:center;gap:7px}
+  .legend hr{border:0;border-top:1px solid var(--line);margin:5px 0}
+  .legend .ring{width:12px;height:12px;border-radius:50%;display:inline-block;background:#fff;flex:none}
   .pop h4{margin:0 0 2px;font-size:14px}
   .pop .a{color:var(--muted);font-size:12px;margin-bottom:6px}
   .pop table{border-collapse:collapse;width:100%;font-size:12.5px}
   .pop td{padding:3px 0}
   .pop td:last-child{text-align:right;font-weight:600}
   .pop .tag{display:inline-block;padding:2px 8px;border-radius:999px;color:#fff;font-size:11.5px;margin-bottom:6px}
+  .pop td:last-child{text-align:right}
+  .pop tr.op td{font-weight:600}
+  .pop .tag{display:inline-block;padding:2px 9px;border-radius:999px;font-size:11.5px;margin-bottom:6px;font-weight:600}
+  .pop .ft{color:var(--muted);font-size:11.5px;margin-top:6px;line-height:1.45}
   @media (max-width:820px){
     #app{grid-template-columns:1fr;grid-template-rows:55vh 1fr}
     #mapwrap{order:-1}
     #panel{border-right:0;border-top:1px solid var(--line)}
+    .legend{display:none}
   }
   @media (prefers-reduced-motion:reduce){*{transition:none!important}}
 </style>
-</head>
-<body>
 <div id="app">
   <aside id="panel">
     <header>
       <h1>ISP confluence map</h1>
+      <h1>ISP demarcation map</h1>
       <div class="sub" id="status">Loading data...</div>
       <button class="link" id="btnOut" hidden>Sign out</button>
     </header>
     <nav role="tablist">
       <button class="on" data-tab="overview">Overview</button>
+      <button class="on" data-tab="demarc">Demarcation</button>
       <button data-tab="buildings">Buildings</button>
       <button data-tab="tolocate" id="navTo">To locate</button>
+      <button data-tab="tolocate" id="navTo">Fix locations</button>
       <button data-tab="data">Data</button>
     </nav>
 
@@ -124,42 +179,78 @@
         <label class="chip"><input type="checkbox" class="nchip" value="1" checked><span class="dot" style="background:var(--c1)"></span>1 ISP</label>
         <label class="chip"><input type="checkbox" class="nchip" value="2" checked><span class="dot" style="background:var(--c2)"></span>2 ISPs</label>
         <label class="chip"><input type="checkbox" class="nchip" value="3" checked><span class="dot" style="background:var(--c3)"></span>3+ ISPs</label>
+    <!-- ===== Demarcation ===== -->
+    <section class="tab on" id="tab-demarc">
+      <label class="f">Who operates a building</label>
+      <div class="seg" role="radiogroup">
+        <label><input type="radio" name="rule" value="building" checked>Building majority</label>
+        <label><input type="radio" name="rule" value="zone">Zone majority</label>
+      </div>
+      <p class="note" id="ruleNote" style="margin:6px 0 0"></p>
+
+      <div class="two">
+        <div><label class="f" for="fSize">Zone size</label>
+          <select id="fSize"><option value="250">250 m</option><option value="500" selected>500 m</option><option value="1000">1 km</option><option value="2000">2 km</option></select></div>
+        <div><label class="f" for="fOp">Operated by</label><select id="fOp"></select></div>
+      </div>
+      <div class="two">
+        <div><label class="f" for="fCity">City</label><select id="fCity"></select></div>
+        <div><label class="f" for="fArea">Area</label><select id="fArea"></select></div>
       </div>
       <label class="f" for="fQ">Search building or area</label>
       <input type="text" id="fQ" placeholder="Type a name...">
       <div class="kpis" style="margin-top:16px">
         <div class="kpi"><b id="kB">0</b><span>buildings shown</span></div>
         <div class="kpi"><b id="kC">0</b><span id="kCs">in confluence (2+ ISPs)</span></div>
+      <label class="f">Show on map</label>
+      <div class="chips">
+        <label class="chip"><input type="checkbox" id="lyZones" checked>Zones</label>
+        <label class="chip"><input type="checkbox" id="lyBld" checked>Buildings</label>
+        <label class="chip"><input type="checkbox" id="lyApprox" checked>Approximate locations</label>
+        <label class="chip"><input type="checkbox" id="lyMoves">Only buildings that change hands</label>
       </div>
       <p class="note" id="pendingNote"></p>
       <h3>Subscribers by ISP</h3>
       <div id="ispBars"></div>
       <p class="note">Solid bar: subscribers sitting in buildings where another ISP is also present. Faded bar: all subscribers of that ISP in the current view.</p>
+      <label class="radio" style="margin-top:10px"><input type="checkbox" id="zApprox" checked><span class="note">Count approximate locations when colouring zones. Untick to colour zones only from confirmed and auto-located buildings (approximate pins can sit in the wrong zone).</span></label>
+
+      <h3>After demarcation <span class="note" id="scopeNote"></span></h3>
+      <div id="ispCards"></div>
+
+      <h3>Subscribers to transfer</h3>
+      <table class="tx" id="txTable"></table>
+      <p class="note" id="tieNote"></p>
     </section>
 
+    <!-- ===== Buildings ===== -->
     <section class="tab" id="tab-buildings">
       <div class="row" style="margin-top:0">
         <button class="btn ghost" id="btnCsv">Export view as CSV</button>
+        <button class="btn" id="btnXlsx">Download demarcation (Excel)</button>
+        <button class="btn ghost" id="btnSaveDem">Save to sheet</button>
       </div>
+      <div id="demMsg"></div>
       <p class="note" id="listNote"></p>
       <ul class="list" id="list"></ul>
     </section>
 
+    <!-- ===== Fix locations ===== -->
     <section class="tab" id="tab-tolocate">
       <p class="note" style="margin-top:0">These buildings are not on the map yet because their position is only approximate. Click one, then drag the pin, click the map, paste coordinates from Google Maps, or type them. Saving moves the building to the map as confirmed and removes it from this list.</p>
+      <p class="note" style="margin-top:0">These buildings sit at an approximate position (dashed outline on the map). They are already counted in the demarcation, but a wrong pin can put a building in the wrong zone. Click one, then drag the pin, click the map, paste coordinates from Google Maps, or type them.</p>
       <div class="row"><button class="btn" id="btnAuto2">Locate next batch automatically</button></div>
       <div id="locMsg"></div>
       <label class="f" for="lArea">Area</label>
-      <select id="lArea"></select>
-      <label class="f" for="lQ">Search</label>
-      <input type="text" id="lQ" placeholder="Type a building or area...">
-      <p class="note" id="locNote"></p>
       <ul class="list" id="locList"></ul>
     </section>
 
+    <!-- ===== Data ===== -->
     <section class="tab" id="tab-data">
       <h3 style="margin-top:0">Load data</h3>
       <p class="note">Fill the Excel template, then upload it here. The dashboard stores it in the Google Sheet, so everyone who opens the link sees the same data.</p>
+      <h3 style="margin-top:0">Upload data</h3>
+      <p class="note">Fill the Excel template (one row per building), then upload it. The data is stored in the Google Sheet, so everyone who opens this page sees the same map. Latitude and Longitude are optional: buildings without them are placed approximately in their area.</p>
       <div class="row">
         <button class="btn ghost" id="btnTpl">Download Excel template</button>
         <button class="btn ghost" id="btnRefresh">Reload from sheet</button>
@@ -177,25 +268,35 @@
       <div style="margin-top:12px">
         <label class="radio"><input type="radio" name="mode" value="replace" checked><span><b>Replace all data</b><br><span class="note">Clears the sheet and loads this file.</span></span></label>
         <label class="radio"><input type="radio" name="mode" value="merge"><span><b>Add to existing data</b><br><span class="note">New buildings are added. Buildings already present (same name, area and city) get updated counts.</span></span></label>
+        <label class="radio"><input type="radio" name="mode" value="merge" checked><span><b>Add to / update existing data</b><br><span class="note">New buildings are added. Buildings already present (same name, area and city) get the new counts.</span></span></label>
+        <label class="radio"><input type="radio" name="mode" value="replace"><span><b>Replace all data</b><br><span class="note">Clears the sheet and loads only this file.</span></span></label>
       </div>
       <div class="row"><button class="btn" id="btnSave" disabled>Save to sheet</button></div>
       <div id="upMsg"></div>
+
+      <h3>Locate buildings automatically</h3>
+      <p class="note">Uses Google's built-in Apps Script geocoder (free, no API key). Buildings with more ISPs are done first; only precise results inside the right area are accepted. Google limits lookups per day, so run it in batches.</p>
+      <div class="row"><button class="btn" id="btnAuto">Locate next batch</button></div>
+      <label class="radio"><input type="checkbox" id="autoRetry"><span class="note">Also retry buildings that failed before</span></label>
+      <div id="autoMsg"></div>
     </section>
   </aside>
+
   <div id="login" hidden role="dialog" aria-modal="true" aria-labelledby="loginTitle">
     <div class="card">
       <h2 id="loginTitle">ISP confluence map</h2>
+      <h2 id="loginTitle">ISP demarcation map</h2>
       <div class="note">Enter the dashboard passcode to continue.</div>
       <label class="f" for="pass">Passcode</label>
       <input type="password" id="pass" autocomplete="current-password">
-      <label class="radio"><input type="checkbox" id="remember"><span class="note">Remember me on this device</span></label>
-      <div class="row"><button class="btn" id="btnLogin">Open dashboard</button></div>
       <div id="loginMsg"></div>
     </div>
   </div>
+
   <main id="mapwrap" aria-label="Map">
     <div id="map"></div>
     <div id="mapMsg" class="mapmsg" hidden>No buildings are located yet. Open the <b>To locate</b> tab to add coordinates, or run the automatic locator.</div>
+    <div id="mapMsg" class="mapmsg" hidden></div>
   </main>
 </div>
 
@@ -209,6 +310,39 @@
   /* ---------- connection: Apps Script page, or GitHub Pages talking to the Apps Script API ---------- */
   var API_URL = 'https://script.google.com/macros/s/AKfycbyeLXAw1azrtSApHOMbpo38p0DABiKed9hW9GBhumdY16uVx5smQ9dTeNdNxU6uKdAG7Q/exec';   // only used when this page is hosted outside Apps Script (e.g. GitHub Pages)
   var HOSTED = !(window.google && google.script && google.script.run);
+  /* =====================================================================
+     CONFIG
+     ===================================================================== */
+  // Your Apps Script web app URL (Deploy > Manage deployments > Web app URL, ends in /exec)
+  var API_URL = 'https://script.google.com/macros/s/AKfycbyeLXAw1azrtSApHOMbpo38p0DABiKed9hW9GBhumdY16uVx5smQ9dTeNdNxU6uKdAG7Q/exec';
+
+  // Fixed colours per ISP (matched on the column name in the sheet)
+  var BRAND = [
+    {re:/\bion\b/i,               color:'#F28C1B', text:'#fff',     short:'iON'},      // orange
+    {re:/netcom|satellite/i,      color:'#1F66D1', text:'#fff',     short:'Netcom'},   // blue
+    {re:/nettvox/i,               color:'#F4C20D', text:'#16232E', short:'Nettvox'}   // yellow
+  ];
+  var SPARE = ['#2E9E6B','#7A5CC2','#C62A3B','#6B7F8E'];
+
+  /* =====================================================================
+     STATE
+     ===================================================================== */
+  var ISPS = [], ICOL = [], ITXT = [], ISHORT = [];
+  var ROWS = [], VIEW = [], ZONES = {}, ZLIST = [], STAGED = null, STAGED_NAME = '', EDIT = null, pin = null;
+  var RES = null;   // last computed demarcation summary
+
+  var $ = function(id){ return document.getElementById(id); };
+  var esc = function(s){ return String(s == null ? '' : s).replace(/[&<>"']/g, function(c){ return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]; }); };
+  var fmt = function(n){ return Number(n).toLocaleString('en-IN'); };
+  var sum = function(a){ return a.reduce(function(x,y){ return x + y; }, 0); };
+  var zeros = function(){ return ISPS.map(function(){ return 0; }); };
+  var hasPos = function(r){ return r.lat != null && r.lng != null && !isNaN(r.lat) && !isNaN(r.lng); };
+  var precise = function(r){ return r.v === 'yes' || r.v === 'auto'; };
+  var rule = function(){ return document.querySelector('input[name=rule]:checked').value; };
+
+  /* =====================================================================
+     CONNECTION (GitHub Pages -> Apps Script web app)
+     ===================================================================== */
   var PASS = '';
   try { PASS = sessionStorage.getItem('isp_pass') || localStorage.getItem('isp_pass') || ''; } catch(e) {}
   function rpc(name, args){
@@ -220,6 +354,9 @@
     }
     if (!API_URL || API_URL.indexOf('http') !== 0) return Promise.reject(new Error('API_URL is not set in this file. Paste your Apps Script web app URL at the top of the script.'));
     return fetch(API_URL, {method:'POST', headers:{'Content-Type':'text/plain;charset=utf-8'}, body: JSON.stringify({action:name, args:args || [], key:PASS}), redirect:'follow'})
+    if (!API_URL || API_URL.indexOf('http') !== 0) return Promise.reject(new Error('API_URL is not set in index.html.'));
+    return fetch(API_URL, {method:'POST', headers:{'Content-Type':'text/plain;charset=utf-8'},
+        body: JSON.stringify({action:name, args:args || [], key:PASS}), redirect:'follow'})
       .then(function(r){ return r.json(); })
       .then(function(j){ if (j.ok) return j.data; var e = new Error(j.error || 'Request failed'); e.code = j.code || ''; throw e; });
   }
@@ -230,23 +367,24 @@
       r[n] = function(){ rpc(n, Array.prototype.slice.call(arguments)).then(ok, function(e){ if (!needLogin(e)) bad(e); }); };
     });
     return r;
+  function call(name, args, ok, bad){
+    rpc(name, args).then(ok, function(e){ if (!needLogin(e)) bad(e); });
   }
   function needLogin(e){
     if (!HOSTED || !e || (e.code !== 'unauthorized' && e.code !== 'locked')) return false;
+    if (!e || (e.code !== 'unauthorized' && e.code !== 'locked')) return false;
     if (e.code === 'unauthorized'){ PASS = ''; try { sessionStorage.removeItem('isp_pass'); localStorage.removeItem('isp_pass'); } catch(x) {} }
     showLogin(e.message);
     return true;
+    showLogin(e.message); return true;
   }
   function showLogin(message){
     $('login').hidden = false; $('btnOut').hidden = true;
-    $('loginMsg').innerHTML = message ? '<div class="msg err">' + esc(message) + '</div>' : '';
-    $('pass').value = ''; $('pass').focus();
-  }
-  function doLogin(){
     var p = $('pass').value;
     if (!p){ $('loginMsg').innerHTML = '<div class="msg err">Enter the passcode.</div>'; return; }
     PASS = p;
     try { (($('remember').checked) ? localStorage : sessionStorage).setItem('isp_pass', p); } catch(e) {}
+    try { ($('remember').checked ? localStorage : sessionStorage).setItem('isp_pass', p); } catch(e) {}
     $('login').hidden = true; $('btnOut').hidden = false; load();
   }
   function start(){
@@ -264,15 +402,28 @@
   var bucket = function(n){ return Math.min(n,3); };
   var ring = function(r){ return r.v === 'yes' ? {color:'#16232E', weight:2.5} : r.v === 'auto' ? {color:'#7A5CC2', weight:2.5} : {color:'#fff', weight:1.5}; };
   var located = function(r){ return r.v === 'yes' || r.v === 'auto'; };
+  $('btnOut').onclick = function(){ PASS = ''; try { sessionStorage.removeItem('isp_pass'); localStorage.removeItem('isp_pass'); } catch(e) {} location.reload(); };
+  $('btnLogin').onclick = doLogin;
+  $('pass').onkeydown = function(e){ if (e.key === 'Enter') doLogin(); };
 
   /* ---------- map ---------- */
   var map = L.map('map', {preferCanvas:true, zoomControl:true}).setView([19.12,72.9], 11);
+  /* =====================================================================
+     MAP (Leaflet + free tiles, no API key)
+     ===================================================================== */
+  var map = L.map('map', {preferCanvas:true}).setView([19.1,72.92], 12);
+  map.createPane('zones'); map.getPane('zones').style.zIndex = 350;
+  var zoneRenderer = L.canvas({pane:'zones'});
+  var light = L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {maxZoom:20, subdomains:'abcd', attribution:'&copy; OpenStreetMap contributors &copy; CARTO'});
   var osm = L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {maxZoom:19, attribution:'&copy; OpenStreetMap contributors'});
   var gray = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Light_Gray_Base/MapServer/tile/{z}/{y}/{x}', {maxZoom:16, maxNativeZoom:16, attribution:'Tiles &copy; Esri'});
   var sat = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {maxZoom:19, attribution:'Tiles &copy; Esri'});
   osm.addTo(map);
   L.control.layers({'Street (OSM)':osm,'Light grey (Esri)':gray,'Satellite (Esri)':sat}, null, {position:'topright'}).addTo(map);
   var layer = L.layerGroup().addTo(map);
+  light.addTo(map);
+  L.control.layers({'Light (CARTO)':light, 'Street (OpenStreetMap)':osm, 'Satellite (Esri)':sat}, null, {position:'topright'}).addTo(map);
+  var zoneLayer = L.layerGroup().addTo(map), edgeLayer = L.layerGroup().addTo(map), bldLayer = L.layerGroup().addTo(map);
 
   var legend = L.control({position:'bottomright'});
   legend.onAdd = function(){
@@ -286,33 +437,135 @@
       '<span class="note">Bigger circle = more subscribers</span>';
     return d;
   };
+  legend.onAdd = function(){ var d = L.DomUtil.create('div','legend'); d.id = 'legend'; return d; };
   legend.addTo(map);
+  function drawLegend(){
+    var h = '<b>Operator</b>';
+    ISPS.forEach(function(n,i){ h += '<div class="r"><span class="dot" style="background:'+ICOL[i]+'"></span><span>'+esc(n)+'</span></div>'; });
+    h += '<hr><div class="r"><span class="sq" style="background:#999"></span><span>Zone: ISP with most subscribers</span></div>'+
+         '<div class="r"><span class="ring" style="border:2px solid #16232E"></span><span>Location confirmed</span></div>'+
+         '<div class="r"><span class="ring" style="border:1.5px solid #555"></span><span>Location auto-found</span></div>'+
+         '<div class="r"><span class="ring" style="border:1.5px dashed #555;opacity:.7"></span><span>Approximate location</span></div>'+
+         '<div class="note">Bigger dot = more subscribers</div>';
+    $('legend').innerHTML = h;
+  }
 
   /* ---------- data ---------- */
+  /* =====================================================================
+     LOAD
+     ===================================================================== */
+  function load(){
+    $('status').textContent = 'Loading data...';
+    call('getData', [], prepare, function(e){ $('status').textContent = 'Could not load data: ' + (e && e.message ? e.message : e); });
+  }
   function prepare(res){
     ISPS = res.isps || [];
     ROWS = (res.rows || []).map(function(r){
       var n = 0, t = 0;
       r.s.forEach(function(v){ if (v > 0) n++; t += v; });
       r.n = n; r.total = t; return r;
+    var spare = 0;
+    ICOL = []; ITXT = []; ISHORT = [];
+    ISPS.forEach(function(n){
+      var b = BRAND.filter(function(x){ return x.re.test(n); })[0];
+      ICOL.push(b ? b.color : SPARE[spare++ % SPARE.length]); ITXT.push(b ? b.text : '#fff'); ISHORT.push(b ? b.short : n);
     });
     $('status').textContent = ROWS.length ? (fmt(ROWS.length)+' buildings, '+ISPS.length+' ISPs. Updated '+new Date(res.updated).toLocaleTimeString()) : 'No data yet. Open the Data tab to upload.';
     fillFilters();
     render(true);
+    ROWS = (res.rows || []).map(function(r){
+      r.s = r.s.map(Number); r.total = sum(r.s); r.n = r.s.filter(function(v){ return v > 0; }).length; return r;
+    }).filter(function(r){ return r.total > 0; });
+    $('status').textContent = ROWS.length ? fmt(ROWS.length) + ' buildings with subscribers, ' + ISPS.length + ' ISPs. Loaded ' + new Date(res.updated).toLocaleTimeString() : 'No data yet. Open the Data tab to upload.';
+    drawLegend(); fillFilters(); compute(); render(true);
   }
   function load(){
     $('status').textContent = 'Loading data...';
     gsr().withSuccessHandler(prepare).withFailureHandler(function(e){
       $('status').textContent = 'Could not load data: ' + (e && e.message ? e.message : e);
     }).getData();
+
+  /* =====================================================================
+     DEMARCATION ENGINE
+     Building operator = ISP with most subscribers in the building.
+     Ties: the tied ISP that leads the building's zone, then its area, then overall.
+     Zone (grid square) leader = ISP with most subscribers across the zone's buildings.
+     ===================================================================== */
+  function argmaxSet(arr, among){
+    var idx = among || arr.map(function(_,i){ return i; });
+    var m = Math.max.apply(null, idx.map(function(i){ return arr[i]; }));
+    return idx.filter(function(i){ return arr[i] === m; });
+  }
+  function narrow(set, tiebreakers){
+    for (var k = 0; k < tiebreakers.length && set.length > 1; k++) if (tiebreakers[k]) set = argmaxSet(tiebreakers[k], set);
+    return set[0];
   }
 
+  function compute(){
+    var size = +$('fSize').value;
+    var meanLat = ROWS.length ? sum(ROWS.filter(hasPos).map(function(r){ return r.lat; })) / Math.max(1, ROWS.filter(hasPos).length) : 19;
+    var dLat = size / 111320, dLng = size / (111320 * Math.cos(meanLat * Math.PI / 180));
+
+    var overall = zeros(), area = {};
+    ROWS.forEach(function(r){
+      var ak = r.a + '|' + r.c; if (!area[ak]) area[ak] = zeros();
+      r.s.forEach(function(v,i){ overall[i] += v; area[ak][i] += v; });
+    });
+
+    ZONES = {};
+    var useApprox = $('zApprox').checked;
+    ROWS.forEach(function(r){
+      r.zone = null;
+      if (!hasPos(r) || (!useApprox && !precise(r))) return;
+      var zi = Math.floor(r.lat / dLat), zj = Math.floor(r.lng / dLng), k = zi + ',' + zj;
+      var z = ZONES[k] || (ZONES[k] = {k:k, i:zi, j:zj, s:zeros(), rows:[], areas:{},
+        bounds:[[zi*dLat, zj*dLng], [(zi+1)*dLat, (zj+1)*dLng]]});
+      r.s.forEach(function(v,i){ z.s[i] += v; });
+      z.rows.push(r); z.areas[r.a + '|' + r.c] = (z.areas[r.a + '|' + r.c] || 0) + 1;
+      r.zone = z;
+    });
+    ZLIST = Object.keys(ZONES).map(function(k){ return ZONES[k]; });
+    ZLIST.forEach(function(z){
+      var mainArea = Object.keys(z.areas).sort(function(a,b){ return z.areas[b] - z.areas[a]; })[0];
+      var tied = argmaxSet(z.s);
+      z.tie = tied.length > 1;
+      z.lead = narrow(tied, [area[mainArea], overall]);
+      z.total = sum(z.s);
+      var sorted = z.s.slice().sort(function(a,b){ return b - a; });
+      z.margin = sorted[0] - (sorted[1] || 0);
+    });
+    // stable, readable zone IDs: north to south, west to east
+    ZLIST.sort(function(a,b){ return b.i - a.i || a.j - b.j; });
+    ZLIST.forEach(function(z,n){ z.id = 'Z' + String(n + 1).padStart(3, '0'); });
+
+    var byZone = rule() === 'zone';
+    ROWS.forEach(function(r){
+      var tied = argmaxSet(r.s);
+      r.tie = tied.length > 1;
+      r.bop = narrow(tied, [r.zone ? r.zone.s : null, area[r.a + '|' + r.c], overall]);  // building-majority operator
+      r.op = byZone && r.zone ? r.zone.lead : r.bop;
+      r.moving = r.total - r.s[r.op];
+    });
+  }
+
+  /* =====================================================================
+     FILTERS
+     ===================================================================== */
+  function uniq(a){ return a.filter(function(v,i){ return v && a.indexOf(v) === i; }).sort(); }
+  function setOptions(sel, list, all){
+    var keep = sel.value; sel.innerHTML = '<option value="">' + all + '</option>';
+    list.forEach(function(v){ var o = document.createElement('option'); o.value = v; o.textContent = v; sel.appendChild(o); });
+    if (list.indexOf(keep) !== -1) sel.value = keep;
+  }
   function fillFilters(){
     var cities = uniq(ROWS.filter(located).map(function(r){return r.c;}));
     setOptions($('fCity'), cities, 'All cities');
+    setOptions($('fCity'), uniq(ROWS.map(function(r){ return r.c; })), 'All cities');
     fillAreas();
     var m = $('fMust'); m.innerHTML = '<option value="">Any</option>';
+    var keep = $('fOp').value, m = $('fOp'); m.innerHTML = '<option value="">Any ISP</option>';
     ISPS.forEach(function(n,i){ var o = document.createElement('option'); o.value = i; o.textContent = n; m.appendChild(o); });
+    m.value = keep;
   }
   function fillAreas(){
     var c = $('fCity').value;
@@ -324,24 +577,105 @@
     var keep = sel.value; sel.innerHTML = '<option value="">'+all+'</option>';
     list.forEach(function(v){ var o = document.createElement('option'); o.value = v; o.textContent = v; sel.appendChild(o); });
     if (list.indexOf(keep) !== -1) sel.value = keep;
+    setOptions($('fArea'), uniq(ROWS.filter(function(r){ return !c || r.c === c; }).map(function(r){ return r.a; })), 'All areas');
   }
 
   function filtered(){
     var city = $('fCity').value, area = $('fArea').value, must = $('fMust').value, q = $('fQ').value.trim().toLowerCase();
     var ns = Array.prototype.slice.call(document.querySelectorAll('.nchip:checked')).map(function(i){ return +i.value; });
+  // rows in scope for the numbers (map layer toggles do not change the numbers)
+  function scoped(){
+    var city = $('fCity').value, ar = $('fArea').value, op = $('fOp').value, q = $('fQ').value.trim().toLowerCase(), mv = $('lyMoves').checked;
     return ROWS.filter(function(r){
       return r.n > 0 && located(r) && (!city || r.c === city) && (!area || r.a === area) &&
         (must === '' || r.s[+must] > 0) && ns.indexOf(bucket(r.n)) !== -1 &&
         (!q || (r.b+' '+r.a).toLowerCase().indexOf(q) !== -1);
+      return (!city || r.c === city) && (!ar || r.a === ar) && (op === '' || r.op === +op) && (!mv || r.moving > 0) &&
+        (!q || (r.b + ' ' + r.a).toLowerCase().indexOf(q) !== -1);
     });
   }
 
+  /* =====================================================================
+     RENDER
+     ===================================================================== */
+  function render(fit){
+    closeEditor();
+    VIEW = scoped();
+    zoneLayer.clearLayers(); edgeLayer.clearLayers(); bldLayer.clearLayers();
+
+    // zones touched by the current city/area/search filter
+    var city = $('fCity').value, ar = $('fArea').value, op = $('fOp').value;
+    var shownZones = {};
+    if ($('lyZones').checked){
+      ZLIST.forEach(function(z){
+        var touch = z.rows.some(function(r){ return (!city || r.c === city) && (!ar || r.a === ar); });
+        if (!touch || (op !== '' && z.lead !== +op)) return;
+        shownZones[z.k] = z;
+        var rect = L.rectangle(z.bounds, {renderer:zoneRenderer, pane:'zones', stroke:false, fillColor:ICOL[z.lead], fillOpacity:.34});
+        rect.bindPopup(function(){ return zonePopup(z); });
+        rect.addTo(zoneLayer);
+      });
+      // territory borders: draw an edge wherever the neighbouring zone has a different leader (or no zone)
+      Object.keys(shownZones).forEach(function(k){
+        var z = shownZones[k], b = z.bounds;
+        var nb = function(di,dj){ return shownZones[(z.i+di) + ',' + (z.j+dj)]; };
+        var sides = [[1,0,[[b[1][0],b[0][1]],[b[1][0],b[1][1]]]], [-1,0,[[b[0][0],b[0][1]],[b[0][0],b[1][1]]]],
+                     [0,1,[[b[0][0],b[1][1]],[b[1][0],b[1][1]]]], [0,-1,[[b[0][0],b[0][1]],[b[1][0],b[0][1]]]]];
+        sides.forEach(function(s){
+          var n = nb(s[0], s[1]);
+          if (!n || n.lead !== z.lead) L.polyline(s[2], {renderer:zoneRenderer, pane:'zones', color:'#16232E', weight:1.4, opacity:.55, interactive:false}).addTo(edgeLayer);
+        });
+      });
+    }
+
+    var pts = [];
+    if ($('lyBld').checked){
+      VIEW.forEach(function(r){
+        if (!hasPos(r)) return;
+        var ap = !precise(r);
+        if (ap && !$('lyApprox').checked) return;
+        var rad = Math.max(4, Math.min(18, 3.5 + Math.sqrt(r.total) * 0.85));
+        var st = r.v === 'yes' ? {color:'#16232E', weight:2.5, opacity:1} : ap ? {color:'#3B4A55', weight:1.2, opacity:.75, dashArray:'3 3'} : {color:'#3B4A55', weight:1.2, opacity:.9};
+        var m = L.circleMarker([r.lat, r.lng], L.extend({radius:rad, fillColor:ICOL[r.op], fillOpacity: ap ? .6 : .92}, st));
+        m.bindPopup(function(){ return popup(r); });
+        m.bindTooltip(esc(r.b) + ' &rarr; ' + esc(ISHORT[r.op]), {direction:'top'});
+        r.m = m; m.addTo(bldLayer); pts.push([r.lat, r.lng]);
+      });
+    }
+    if (!pts.length) Object.keys(shownZones).forEach(function(k){ var b = shownZones[k].bounds; pts.push(b[0], b[1]); });
+    if (fit && pts.length) map.fitBounds(pts, {padding:[30,30], maxZoom:16});
+    $('mapMsg').hidden = ROWS.length > 0;
+    $('mapMsg').innerHTML = 'No data yet. Open the <b>Data</b> tab to upload an Excel file.';
+    stats(); list(); locList();
+  }
+
+  function swatch(i){ return '<span class="tag" style="background:'+ICOL[i]+';color:'+ITXT[i]+'">'; }
   function popup(r){
     var rowsHtml = ISPS.map(function(n,i){ return '<tr><td>'+esc(n)+'</td><td>'+fmt(r.s[i])+'</td></tr>'; }).join('');
     var tag = r.n >= 3 ? '3+ ISPs (confluence)' : r.n === 2 ? '2 ISPs (confluence)' : '1 ISP only';
     return '<div class="pop"><span class="tag" style="background:'+COL[bucket(r.n)]+'">'+tag+'</span>'+
+    var rows = ISPS.map(function(n,i){
+      var role = i === r.op ? 'operates' : (r.s[i] > 0 ? 'hands over' : '');
+      return '<tr class="'+(i === r.op ? 'op' : '')+'"><td><span class="dot" style="background:'+ICOL[i]+';vertical-align:-1px;margin-right:6px"></span>'+esc(n)+'</td><td>'+fmt(r.s[i])+(role ? ' <span class="note">'+role+'</span>' : '')+'</td></tr>';
+    }).join('');
+    var ft = [];
+    if (r.tie) ft.push('Tie on subscribers, given to the tied ISP that leads the surrounding zone (or area).');
+    if (rule() === 'zone' && r.op !== r.bop) ft.push('Zone majority rule: building majority would be ' + esc(ISPS[r.bop]) + '.');
+    if (r.zone) ft.push('Zone ' + r.zone.id + ' is led by ' + esc(ISPS[r.zone.lead]) + '.'); else if (hasPos(r)) ft.push('Not counted in any zone (approximate location).');
+    ft.push(r.v === 'yes' ? 'Location confirmed.' : r.v === 'auto' ? 'Location found automatically.' : 'Approximate location.');
+    return '<div class="pop">'+swatch(r.op)+'Operated by '+esc(ISPS[r.op])+'</span>'+
       '<h4>'+esc(r.b)+'</h4><div class="a">'+esc(r.a)+(r.c ? ', '+esc(r.c) : '')+'</div>'+
       '<table>'+rowsHtml+'<tr><td><b>Total</b></td><td>'+fmt(r.total)+'</td></tr></table></div>';
+      '<table>'+rows+'<tr><td><b>Total</b></td><td><b>'+fmt(r.total)+'</b></td></tr></table>'+
+      (r.moving ? '<div class="ft"><b>'+fmt(r.moving)+'</b> subscriber'+(r.moving>1?'s':'')+' move to '+esc(ISPS[r.op])+'.</div>' : '')+
+      '<div class="ft">'+ft.join(' ')+'</div></div>';
+  }
+  function zonePopup(z){
+    var rows = ISPS.map(function(n,i){ return '<tr class="'+(i === z.lead ? 'op' : '')+'"><td><span class="dot" style="background:'+ICOL[i]+';vertical-align:-1px;margin-right:6px"></span>'+esc(n)+'</td><td>'+fmt(z.s[i])+'</td></tr>'; }).join('');
+    var areas = Object.keys(z.areas).map(function(k){ return k.split('|')[0]; });
+    return '<div class="pop">'+swatch(z.lead)+'Zone '+z.id+' &middot; '+esc(ISPS[z.lead])+'</span>'+
+      '<h4>'+fmt(z.rows.length)+' building'+(z.rows.length>1?'s':'')+', '+fmt(z.total)+' subscribers</h4><div class="a">'+esc(areas.join(', '))+'</div>'+
+      '<table>'+rows+'</table><div class="ft">'+(z.tie ? 'Tie, given to the leader of the main area.' : 'Leads by '+fmt(z.margin)+' subscribers.')+'</div></div>';
   }
 
   function render(fit){
@@ -349,16 +683,29 @@
     VIEW = filtered();
     layer.clearLayers();
     var pts = [];
+  function stats(){
+    var now = zeros(), after = zeros(), keep = zeros(), gain = zeros(), lose = zeros(), bld = zeros(), zn = zeros();
+    var T = ISPS.map(function(){ return ISPS.map(function(){ return {s:0, b:0}; }); });
+    var ties = 0, approx = 0;
     VIEW.forEach(function(r){
       var rad = Math.max(6, Math.min(24, 5 + Math.sqrt(r.total) * 0.9));
       var m = L.circleMarker([r.lat, r.lng], {radius:rad, color:ring(r).color, weight:ring(r).weight, fillColor:COL[bucket(r.n)], fillOpacity:.88});
       m.bindPopup(function(){ return popup(r); });
       m.bindTooltip(esc(r.b), {direction:'top'});
       r.m = m; m.addTo(layer); pts.push([r.lat, r.lng]);
+      bld[r.op]++; if (r.tie) ties++; if (!precise(r)) approx++;
+      r.s.forEach(function(v,i){
+        now[i] += v; after[r.op] += v;
+        if (i === r.op) keep[i] += v;
+        else if (v > 0){ lose[i] += v; gain[r.op] += v; T[i][r.op].s += v; T[i][r.op].b++; }
+      });
     });
     if (fit && pts.length) map.fitBounds(pts, {padding:[40,40], maxZoom:15});
     stats(); list(); locList(); pending();
   }
+    var zset = {}; VIEW.forEach(function(r){ if (r.zone) zset[r.zone.k] = r.zone; });
+    Object.keys(zset).forEach(function(k){ zn[zset[k].lead]++; });
+    RES = {now:now, after:after, keep:keep, gain:gain, lose:lose, bld:bld, zones:zn, T:T};
 
   function stats(){
     $('kB').textContent = fmt(VIEW.length);
@@ -373,14 +720,35 @@
       return '<div class="bar"><div class="t"><span>'+esc(n)+'</span><span>'+fmt(shr[i])+' of '+fmt(tot[i])+' shared</span></div>'+
         '<div class="track"><div class="all" style="width:'+(tot[i]*100/max)+'%;background:'+c+'"></div>'+
         '<div class="shared" style="width:'+(shr[i]*100/max)+'%;background:'+c+'"></div></div></div>';
+    var filtered = $('fCity').value || $('fArea').value || $('fOp').value !== '' || $('fQ').value.trim() || $('lyMoves').checked;
+    $('scopeNote').textContent = filtered ? '(filtered: ' + fmt(VIEW.length) + ' buildings)' : '(all ' + fmt(VIEW.length) + ' buildings)';
+    $('ispCards').innerHTML = ISPS.map(function(n,i){
+      return '<div class="isp" style="border-left-color:'+ICOL[i]+'"><div class="hd"><b>'+esc(n)+'</b><span><span class="big">'+fmt(bld[i])+'</span> <span class="note">buildings &middot; '+fmt(zn[i])+' zones</span></span></div>'+
+        '<div class="ln"><span>Subscribers today</span><span>'+fmt(now[i])+'</span></div>'+
+        '<div class="ln"><span>Hands over / takes in</span><span><span class="neg">&minus;'+fmt(lose[i])+'</span> / <span class="pos">+'+fmt(gain[i])+'</span></span></div>'+
+        '<div class="ln"><span>Subscribers after demarcation</span><span><b>'+fmt(after[i])+'</b></span></div></div>';
     }).join('');
+
+    var tx = [];
+    ISPS.forEach(function(f,i){ ISPS.forEach(function(t,j){ if (T[i][j].s) tx.push({f:i, t:j, s:T[i][j].s, b:T[i][j].b}); }); });
+    tx.sort(function(a,b){ return b.s - a.s; });
+    $('txTable').innerHTML = tx.length ? '<tr><th>From</th><th>To</th><th class="r">Buildings</th><th class="r">Subscribers</th></tr>' + tx.map(function(x){
+      return '<tr><td><span class="dot" style="background:'+ICOL[x.f]+';vertical-align:-1px;margin-right:5px"></span>'+esc(ISHORT[x.f])+'</td><td><span class="dot" style="background:'+ICOL[x.t]+';vertical-align:-1px;margin-right:5px"></span>'+esc(ISHORT[x.t])+'</td><td class="r">'+fmt(x.b)+'</td><td class="r">'+fmt(x.s)+'</td></tr>';
+    }).join('') + '<tr><td colspan="3"><b>Total moving</b></td><td class="r"><b>'+fmt(sum(lose))+'</b></td></tr>' : '<tr><td class="note">No subscribers change ISP in this view.</td></tr>';
+    $('tieNote').textContent = fmt(ties) + ' tied building' + (ties === 1 ? '' : 's') + ' in view, each given to the tied ISP that leads its zone (or area). ' +
+      fmt(approx) + ' building' + (approx === 1 ? ' has' : 's have') + ' an approximate location (see Fix locations).';
+    $('ruleNote').textContent = rule() === 'zone'
+      ? 'Every building in a zone goes to the ISP with the most subscribers across that zone, so each zone has a single operator.'
+      : 'Each building goes to the ISP with the most subscribers in it. The shaded zones show which ISP dominates each area.';
   }
 
   function list(){
     var sorted = VIEW.slice().sort(function(a,b){ return b.n - a.n || b.total - a.total; });
+    var sorted = VIEW.slice().sort(function(a,b){ return b.moving - a.moving || b.total - a.total; });
     var shown = sorted.slice(0, 300);
     var conf = VIEW.filter(function(r){ return r.v === 'yes'; }).length, auto = VIEW.filter(function(r){ return r.v === 'auto'; }).length;
     $('listNote').textContent = fmt(VIEW.length) + ' buildings in view' + (VIEW.length > 300 ? ' (top 300 listed, export for all)' : '') + ', ' + fmt(conf) + ' confirmed, ' + fmt(auto) + ' auto-located. Click a building to correct its latitude and longitude.';
+    $('listNote').textContent = fmt(VIEW.length) + ' buildings in view' + (VIEW.length > 300 ? ' (top 300 listed; the Excel download has all)' : '') + '. Sorted by subscribers that change ISP. Click a building to zoom to it and correct its location.';
     var ul = $('list'); ul.innerHTML = '';
     shown.forEach(function(r){
       var li = document.createElement('li'); li.className = 'bi';
@@ -390,6 +758,7 @@
       item.onclick = go; item.onkeydown = function(e){ if (e.key === 'Enter') go(); };
       li.appendChild(item); ul.appendChild(li);
     });
+    shown.forEach(function(r){ ul.appendChild(item(r, true)); });
   }
 
   function pending(){
@@ -401,6 +770,16 @@
   function refreshFilters(){
     setOptions($('fCity'), uniq(ROWS.filter(located).map(function(r){return r.c;})), 'All cities');
     fillAreas();
+  function item(r, zoomClose){
+    var li = document.createElement('li'); li.className = 'bi';
+    var it = document.createElement('div'); it.className = 'item'; it.tabIndex = 0;
+    var counts = ISPS.map(function(n,i){ return r.s[i] ? esc(ISHORT[i]) + ' ' + fmt(r.s[i]) : ''; }).filter(String).join(' &middot; ');
+    var tag = r.v === 'yes' ? '<span class="tagv">confirmed</span>' : r.v === 'auto' ? '<span class="tagv auto">auto-located</span>' : r.v === 'tried' ? '<span class="tagv approx">auto-locate failed</span>' : '<span class="tagv approx">approximate</span>';
+    it.innerHTML = '<span class="dot" style="background:'+ICOL[r.op]+'"></span><div class="n"><div>'+esc(r.b)+'</div><div class="sb">'+esc(r.a)+' &middot; '+counts+(r.tie ? '<span class="tagv tie">tie</span>' : '')+tag+'</div></div>'+
+      '<span class="tot">'+esc(ISHORT[r.op])+(r.moving ? '<br><span class="note">+'+fmt(r.moving)+' moving</span>' : '')+'</span>';
+    var go = function(){ if (hasPos(r)) map.flyTo([r.lat, r.lng], zoomClose ? 17 : 15, {duration:.8}); openEditor(r, li); };
+    it.onclick = go; it.onkeydown = function(e){ if (e.key === 'Enter') go(); };
+    li.appendChild(it); return li;
   }
   function locList(){
     closeEditor();
@@ -408,9 +787,15 @@
     setOptions($('lArea'), uniq(all.map(function(r){return r.a;})), 'All areas');
     var area = $('lArea').value, q = $('lQ').value.trim().toLowerCase();
     var rows = all.filter(function(r){ return (!area || r.a === area) && (!q || (r.b+' '+r.a).toLowerCase().indexOf(q) !== -1); })
+    var all = ROWS.filter(function(r){ return !precise(r); });
+    setOptions($('lArea'), uniq(all.map(function(r){ return r.a; })), 'All areas');
+    var ar = $('lArea').value, q = $('lQ').value.trim().toLowerCase();
+    var rows = all.filter(function(r){ return (!ar || r.a === ar) && (!q || (r.b + ' ' + r.a).toLowerCase().indexOf(q) !== -1); })
       .sort(function(a,b){ return b.n - a.n || b.total - a.total; });
     $('navTo').textContent = 'To locate (' + fmt(all.length) + ')';
     $('locNote').textContent = fmt(all.length) + ' buildings still need a location' + (rows.length !== all.length ? ' (' + fmt(rows.length) + ' match your filter)' : '') + (rows.length > 200 ? ', top 200 listed' : '') + '. Buildings with more ISPs come first.';
+    $('navTo').textContent = 'Fix locations (' + fmt(all.length) + ')';
+    $('locNote').textContent = fmt(all.length) + ' buildings have an approximate location' + (rows.length !== all.length ? ' (' + fmt(rows.length) + ' match your filter)' : '') + (rows.length > 200 ? ', top 200 listed' : '') + '. Buildings shared by more ISPs come first because they decide transfers.';
     var ul = $('locList'); ul.innerHTML = '';
     rows.slice(0, 200).forEach(function(r){
       var li = document.createElement('li'); li.className = 'bi';
@@ -420,53 +805,44 @@
       item.onclick = go; item.onkeydown = function(e){ if (e.key === 'Enter') go(); };
       li.appendChild(item); ul.appendChild(li);
     });
+    rows.slice(0, 200).forEach(function(r){ ul.appendChild(item(r, false)); });
   }
 
   /* ---------- fix a building's location ---------- */
+  /* =====================================================================
+     FIX A BUILDING'S LOCATION
+     ===================================================================== */
   function closeEditor(){
     if (pin){ map.removeLayer(pin); pin = null; }
     EDIT = null;
-    var o = document.querySelector('.edit'); if (o) o.remove();
-  }
-  function setPos(lat, lng, fromInput){
-    if (!fromInput){ $('eLat').value = lat.toFixed(6); $('eLng').value = lng.toFixed(6); }
-    if (pin) pin.setLatLng([lat, lng]);
-  }
   function openEditor(r, li){
     if (EDIT === r){ closeEditor(); return; }
     closeEditor(); EDIT = r;
+    var start = hasPos(r) ? [r.lat, r.lng] : [map.getCenter().lat, map.getCenter().lng];
     var box = document.createElement('div'); box.className = 'edit';
     box.innerHTML =
       '<div class="note">' + (r.v === 'yes' ? 'This location is confirmed.' : r.v === 'auto' ? 'This location was found automatically. Check it against Google Maps.' : 'This building is not on the map yet. The pin shows only the approximate neighbourhood.') +
+      '<div class="note">' + (r.v === 'yes' ? 'This location is confirmed.' : r.v === 'auto' ? 'This location was found automatically. Check it against Google Maps.' : 'This pin is only approximate.') +
       ' Drag the pin, click the map, or type the coordinates.</div>' +
       '<label class="f" for="ePaste">Paste from Google Maps (right-click the spot, click the coordinates)</label>' +
       '<input type="text" id="ePaste" placeholder="19.118986, 72.911767">' +
-      '<div class="two"><div><label class="f" for="eLat">Latitude</label><input type="text" id="eLat"></div>' +
-      '<div><label class="f" for="eLng">Longitude</label><input type="text" id="eLng"></div></div>' +
       '<div class="row"><button class="btn" id="eSave">Save to sheet</button><button class="btn ghost" id="eClose">Close</button></div>' +
       '<div id="eMsg"></div>';
     li.appendChild(box);
     pin = L.marker([r.lat, r.lng], {draggable:true, icon:L.divIcon({className:'pin', html:'<span></span>', iconSize:[22,22], iconAnchor:[11,11]})}).addTo(map);
+    pin = L.marker(start, {draggable:true, icon:L.divIcon({className:'pin', html:'<span></span>', iconSize:[22,22], iconAnchor:[11,11]})}).addTo(map);
     pin.on('dragend', function(){ var p = pin.getLatLng(); setPos(p.lat, p.lng); });
     $('eLat').value = r.lat.toFixed(6); $('eLng').value = r.lng.toFixed(6);
+    $('eLat').value = start[0].toFixed(6); $('eLng').value = start[1].toFixed(6);
     var fromFields = function(){
       var la = parseFloat($('eLat').value), ln = parseFloat($('eLng').value);
       if (!isNaN(la) && !isNaN(ln) && Math.abs(la) <= 90 && Math.abs(ln) <= 180) setPos(la, ln, true);
-    };
-    $('eLat').oninput = fromFields; $('eLng').oninput = fromFields;
-    $('ePaste').oninput = function(){
-      var m = this.value.match(/(-?\d+(?:\.\d+)?)\s*[,;\s]\s*(-?\d+(?:\.\d+)?)/);
-      if (m){ $('eLat').value = m[1]; $('eLng').value = m[2]; fromFields(); }
-    };
-    $('eClose').onclick = closeEditor;
-    $('eSave').onclick = function(){
-      var la = parseFloat($('eLat').value), ln = parseFloat($('eLng').value);
-      if (isNaN(la) || isNaN(ln) || Math.abs(la) > 90 || Math.abs(ln) > 180){
         $('eMsg').innerHTML = '<div class="msg err">Enter a valid latitude (-90 to 90) and longitude (-180 to 180).</div>'; return;
       }
       $('eSave').disabled = true; $('eMsg').innerHTML = '<div class="msg info">Saving...</div>';
       gsr().withSuccessHandler(function(res){
         var wasOn = located(r);
+      call('updateBuildingLocation', [r.b, r.a, r.c, la, ln], function(res){
         r.lat = res.lat; r.lng = res.lng; r.v = 'yes';
         if (!wasOn){
           closeEditor(); refreshFilters(); render(false);
@@ -480,9 +856,14 @@
         $('eMsg').innerHTML = '<div class="msg ok">Saved to the sheet. This building is now marked as confirmed.</div>';
         var sb = li.querySelector('.sb'); if (sb){ var old = sb.querySelector('.tagv'); if (old) old.remove(); sb.insertAdjacentHTML('beforeend', '<span class="tagv">confirmed</span>'); }
       }).withFailureHandler(function(e){
+        compute(); render(false);
+        map.flyTo([r.lat, r.lng], 17, {duration:.8});
+        $('locMsg').innerHTML = '<div class="msg ok">Saved <b>' + esc(r.b) + '</b> as confirmed. Zones were recalculated.</div>';
+      }, function(e){
         $('eSave').disabled = false;
         $('eMsg').innerHTML = '<div class="msg err">' + esc(e && e.message ? e.message : e) + '</div>';
       }).updateBuildingLocation(r.b, r.a, r.c, la, ln);
+      });
     };
     li.scrollIntoView({block:'nearest'});
   }
@@ -496,36 +877,97 @@
     VIEW.forEach(function(r){ lines.push([r.b,r.a,r.c,r.lat,r.lng].concat(r.s).concat([r.n,r.total]).map(q).join(',')); });
     var blob = new Blob([lines.join('\n')], {type:'text/csv'});
     var a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'isp_confluence_view.csv'; a.click();
+  /* =====================================================================
+     EXPORT: demarcation workbook / save to sheet
+     ===================================================================== */
+  function buildingsAoa(){
+    var head = ['Building Name','Area','City','Latitude','Longitude'].concat(ISPS).concat(['Total Subscribers','Operator (after demarcation)','Rule','Tie','Subscribers moving','Moving from','Zone','Zone Leader','Location Status']);
+    var aoa = [head];
+    ROWS.slice().sort(function(a,b){ return (a.c+a.a+a.b).localeCompare(b.c+b.a+b.b); }).forEach(function(r){
+      var from = ISPS.filter(function(n,i){ return i !== r.op && r.s[i] > 0; }).join(', ');
+      aoa.push([r.b, r.a, r.c, hasPos(r) ? r.lat : '', hasPos(r) ? r.lng : ''].concat(r.s).concat([
+        r.total, ISPS[r.op], rule() === 'zone' ? 'Zone majority' : 'Building majority', r.tie ? 'Yes' : '', r.moving, from,
+        r.zone ? r.zone.id : '', r.zone ? ISPS[r.zone.lead] : '',
+        r.v === 'yes' ? 'Confirmed' : r.v === 'auto' ? 'Auto-located' : 'Approximate']));
+    });
+    return aoa;
+  }
+  $('btnXlsx').onclick = function(){
+    if (!ROWS.length) return;
+    var sv = VIEW; VIEW = ROWS; stats(); var all = RES; VIEW = sv; stats();   // summary for the whole dataset
+    var wb = XLSX.utils.book_new();
+    var sumAoa = [['ISP','Buildings operated','Zones led','Subscribers today','Kept','Handed over','Taken in','Subscribers after']];
+    ISPS.forEach(function(n,i){ sumAoa.push([n, all.bld[i], all.zones[i], all.now[i], all.keep[i], all.lose[i], all.gain[i], all.after[i]]); });
+    sumAoa.push([]); sumAoa.push(['Rule', rule() === 'zone' ? 'Zone majority' : 'Building majority']); sumAoa.push(['Zone size (m)', +$('fSize').value]); sumAoa.push(['Generated', new Date().toLocaleString()]);
+    var tx = [['From','To','Buildings','Subscribers']];
+    ISPS.forEach(function(f,i){ ISPS.forEach(function(t,j){ if (all.T[i][j].s) tx.push([f, t, all.T[i][j].b, all.T[i][j].s]); }); });
+    var zn = [['Zone','Centre Latitude','Centre Longitude','Buildings'].concat(ISPS).concat(['Total','Leader','Lead margin','Tie','Areas'])];
+    ZLIST.forEach(function(z){
+      zn.push([z.id, +((z.bounds[0][0]+z.bounds[1][0])/2).toFixed(6), +((z.bounds[0][1]+z.bounds[1][1])/2).toFixed(6), z.rows.length].concat(z.s)
+        .concat([z.total, ISPS[z.lead], z.margin, z.tie ? 'Yes' : '', Object.keys(z.areas).map(function(k){ return k.split('|')[0]; }).join(', ')]));
+    });
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(sumAoa), 'Summary');
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(buildingsAoa()), 'Buildings');
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(tx), 'Transfers');
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(zn), 'Zones');
+    XLSX.writeFile(wb, 'ISP_Demarcation.xlsx');
   };
   $('btnTpl').onclick = function(){
     var aoa = [['Building Name','Area','City','Latitude','Longitude','iON Network','Acquired ISP 1','Acquired ISP 2'],
                ['Sample - Lake Castle Tower','Hiranandani Gardens Powai','Mumbai',19.1197,72.9105,120,35,0]];
     var wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(aoa), 'Data');
     XLSX.writeFile(wb, 'ISP_Confluence_Template.xlsx');
+  $('btnSaveDem').onclick = function(){
+    if (!ROWS.length) return;
+    var btn = this; btn.disabled = true;
+    $('demMsg').innerHTML = '<div class="msg info">Saving all ' + fmt(ROWS.length) + ' buildings to the "Demarcation" tab...</div>';
+    call('saveDemarcation', [buildingsAoa()], function(r){
+      btn.disabled = false;
+      $('demMsg').innerHTML = '<div class="msg ok">Saved ' + fmt(r.written) + ' buildings to the <b>Demarcation</b> tab of the Google Sheet.</div>';
+    }, function(e){ btn.disabled = false; $('demMsg').innerHTML = '<div class="msg err">' + esc(e && e.message ? e.message : e) + '</div>'; });
   };
 
   /* ---------- upload ---------- */
+  /* =====================================================================
+     UPLOAD
+     ===================================================================== */
+  $('btnTpl').onclick = function(){
+    var isps = ISPS.length ? ISPS : ['iON Network','Nettvox','Satellite Netcom'];
+    var aoa = [['Building Name','Area','City','Latitude','Longitude'].concat(isps),
+               ['Sample - Maitri Chs','Ghatkopar West','Mumbai',19.096919,72.913613].concat(isps.map(function(_,i){ return [10,68,0][i] || 0; })),
+               ['Sample - building without coordinates','Ghatkopar East','Mumbai','',''].concat(isps.map(function(_,i){ return [3,0,7][i] || 0; }))];
+    var help = [['How to fill this template'],
+      ['One row per building. Building Name and Area are required; City is recommended.'],
+      ['Latitude/Longitude are optional (decimal degrees, e.g. 19.0969 and 72.9136). Leave blank if unknown.'],
+      ['One column per ISP with the number of subscribers in that building (0 if none).'],
+      ['A new ISP column adds a new ISP to the map. Delete the sample rows before uploading.']];
+    var wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(aoa), 'Data');
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(help), 'Instructions');
+    XLSX.writeFile(wb, 'ISP_Data_Template.xlsx');
+  };
   function msg(cls, html){ $('upMsg').innerHTML = '<div class="msg '+cls+'">'+html+'</div>'; }
   function stage(file){
     if (!file) return;
-    var rd = new FileReader();
-    rd.onload = function(e){
-      try{
         var wb = XLSX.read(new Uint8Array(e.target.result), {type:'array'});
         var name = wb.SheetNames.indexOf('Data') !== -1 ? 'Data' : wb.SheetNames[0];
         var aoa = XLSX.utils.sheet_to_json(wb.Sheets[name], {header:1, defval:'', raw:true})
           .filter(function(r){ return r.some(function(v){ return String(v).trim() !== ''; }); });
+          .filter(function(r){ return r.some(function(v){ return String(v).trim() !== ''; }); })
+          .filter(function(r){ return !/^sample\b/i.test(String(r[0])); });
         if (aoa.length < 2) throw new Error('The file has no data rows.');
         STAGED = aoa; STAGED_NAME = file.name;
         $('dropTxt').textContent = file.name + ' ready (' + (aoa.length - 1) + ' rows)';
         $('btnSave').disabled = false;
         msg('info', 'Sheet "'+esc(name)+'" read. Choose Replace or Add, then click Save to sheet.');
+        msg('info', 'Sheet "' + esc(name) + '" read, ' + (aoa.length - 1) + ' rows. Columns: ' + esc(aoa[0].join(', ')) + '. Choose Add or Replace, then click Save to sheet.');
       }catch(err){ STAGED = null; $('btnSave').disabled = true; msg('err', 'Could not read the file: ' + esc(err.message)); }
     };
     rd.readAsArrayBuffer(file);
   }
   $('drop').onclick = function(){ $('file').click(); };
   $('drop').onkeydown = function(e){ if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); $('file').click(); } };
+  $('drop').onkeydown = function(e){ if (e.key === 'Enter' || e.key === ' '){ e.preventDefault(); $('file').click(); } };
   $('file').onchange = function(){ stage(this.files[0]); };
   ['dragover','dragenter'].forEach(function(ev){ $('drop').addEventListener(ev, function(e){ e.preventDefault(); $('drop').classList.add('over'); }); });
   ['dragleave','drop'].forEach(function(ev){ $('drop').addEventListener(ev, function(e){ e.preventDefault(); $('drop').classList.remove('over'); }); });
@@ -535,41 +977,50 @@
     if (!STAGED) return;
     var mode = document.querySelector('input[name=mode]:checked').value;
     if (mode === 'replace' && !confirm('This will replace all existing data in the sheet with ' + STAGED_NAME + ', including any locations you corrected here (unless the file has a Location Verified column). Continue?')) return;
+    if (mode === 'replace' && !confirm('This replaces ALL data in the sheet with ' + STAGED_NAME + ', including locations you corrected here. Continue?')) return;
     $('btnSave').disabled = true; msg('info', 'Saving...');
     gsr().withSuccessHandler(function(r){
+    call('saveUploadedData', [STAGED, mode], function(r){
       var html = 'Saved. ' + fmt(r.written) + ' buildings in the sheet (' + fmt(r.added) + ' added, ' + fmt(r.updated) + ' updated).';
       if (r.skipped && r.skipped.length){
         html += '<br><b>' + r.skipped.length + ' row(s) skipped:</b><br>' +
-          r.skipped.slice(0, 10).map(function(s){ return 'Row ' + s.row + ': ' + esc(s.reason); }).join('<br>') +
-          (r.skipped.length > 10 ? '<br>...and ' + (r.skipped.length - 10) + ' more' : '');
-      }
       msg(r.skipped && r.skipped.length ? 'info' : 'ok', html);
       STAGED = null; $('dropTxt').textContent = 'Drop an .xlsx or .csv file here, or click to choose'; $('file').value = '';
       load();
     }).withFailureHandler(function(e){
       $('btnSave').disabled = false; msg('err', esc(e && e.message ? e.message : e));
     }).saveUploadedData(STAGED, mode);
+    }, function(e){ $('btnSave').disabled = false; msg('err', esc(e && e.message ? e.message : e)); });
   };
   $('btnRefresh').onclick = load;
 
   function runAuto(btn, msgEl){
+  function runAuto(btn, el){
     btn.disabled = true;
     msgEl.innerHTML = '<div class="msg info">Locating up to 100 buildings. This can take a few minutes, please keep this tab open...</div>';
     gsr().withSuccessHandler(function(r){
+    el.innerHTML = '<div class="msg info">Locating up to 100 buildings. This can take a few minutes, please keep this tab open...</div>';
+    call('autoLocateBatch', [100, $('autoRetry').checked], function(r){
       btn.disabled = false;
       var html = 'Checked ' + fmt(r.processed) + ': <b>' + fmt(r.located) + ' moved to the map</b>, ' + fmt(r.failed) + ' stay in the To locate list. ' + fmt(r.remaining) + ' buildings still to check.';
+      var html = 'Checked ' + fmt(r.processed) + ': <b>' + fmt(r.located) + ' located</b>, ' + fmt(r.failed) + ' not found. ' + fmt(r.remaining) + ' still to check.';
       if (r.quotaHit) html += '<br>Google\'s daily lookup limit was reached. Run the next batch tomorrow.';
       else if (r.remaining > 0) html += '<br>Click again for the next batch.';
       msgEl.innerHTML = '<div class="msg ok">' + html + '</div>';
+      el.innerHTML = '<div class="msg ok">' + html + '</div>';
       load();
     }).withFailureHandler(function(e){
       btn.disabled = false; msgEl.innerHTML = '<div class="msg err">' + esc(e && e.message ? e.message : e) + '</div>';
     }).autoLocateBatch(100, $('autoRetry').checked);
+    }, function(e){ btn.disabled = false; el.innerHTML = '<div class="msg err">' + esc(e && e.message ? e.message : e) + '</div>'; });
   }
   $('btnAuto').onclick = function(){ runAuto(this, $('autoMsg')); };
   $('btnAuto2').onclick = function(){ runAuto(this, $('locMsg')); };
 
   /* ---------- UI wiring ---------- */
+  /* =====================================================================
+     UI WIRING
+     ===================================================================== */
   Array.prototype.forEach.call(document.querySelectorAll('nav button'), function(b){
     b.onclick = function(){
       Array.prototype.forEach.call(document.querySelectorAll('nav button'), function(x){ x.classList.toggle('on', x === b); });
@@ -577,14 +1028,20 @@
     };
   });
   $('lArea').onchange = locList; $('lQ').oninput = locList;
+  var recompute = function(){ compute(); render(false); };
+  Array.prototype.forEach.call(document.querySelectorAll('input[name=rule]'), function(r){ r.onchange = recompute; });
+  $('fSize').onchange = recompute; $('zApprox').onchange = recompute;
   $('fCity').onchange = function(){ fillAreas(); render(true); };
   $('fArea').onchange = function(){ render(true); };
   $('fMust').onchange = function(){ render(true); };
+  $('fOp').onchange = function(){ render(false); };
   $('fQ').oninput = function(){ render(false); };
   Array.prototype.forEach.call(document.querySelectorAll('.nchip'), function(c){ c.onchange = function(){ render(false); }; });
+  ['lyZones','lyBld','lyApprox','lyMoves'].forEach(function(id){ $(id).onchange = function(){ render(false); }; });
+  $('lArea').onchange = locList; $('lQ').oninput = locList;
 
   start();
+  if (!PASS) showLogin(''); else { $('btnOut').hidden = false; load(); }
 })();
 </script>
 </body>
-</html>
