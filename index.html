@@ -1,0 +1,707 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ISP Confluence Map</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<style>
+  /* ============ CONFIG lives in the <script> below (API_URL) ============ */
+  :root {
+    --ion: #F97316;      /* Orange  – iON Network */
+    --netcom: #2563EB;   /* Blue    – Satellite Netcom */
+    --nettvox: #FACC15;  /* Yellow  – Nettvox */
+    --tie: #9CA3AF;      /* Grey    – Tie, needs review */
+    --bg: #F6F7F9; --panel: #FFFFFF; --text: #111827; --muted: #6B7280;
+    --border: #E5E7EB; --accent: #111827; --danger: #B91C1C; --ok: #047857;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #0F1115; --panel: #171A21; --text: #E5E7EB; --muted: #9CA3AF;
+      --border: #2A2F3A; --accent: #E5E7EB; --danger: #F87171; --ok: #34D399;
+    }
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; background: var(--bg); color: var(--text);
+    font: 14px/1.45 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+  button, select, input { font: inherit; color: inherit; }
+  button { cursor: pointer; }
+
+  /* ---------- Login ---------- */
+  #login { position: fixed; inset: 0; display: flex; align-items: center; justify-content: center;
+    background: var(--bg); z-index: 3000; padding: 16px; }
+  #login form { width: 100%; max-width: 360px; background: var(--panel); border: 1px solid var(--border);
+    border-radius: 12px; padding: 28px; }
+  #login h1 { margin: 0 0 4px; font-size: 20px; }
+  #login p { margin: 0 0 20px; color: var(--muted); }
+  #login input { width: 100%; padding: 10px 12px; border: 1px solid var(--border); border-radius: 8px;
+    background: var(--bg); margin-bottom: 12px; }
+  .btn { padding: 8px 14px; border-radius: 8px; border: 1px solid var(--border); background: var(--panel); }
+  .btn:hover { border-color: var(--muted); }
+  .btn-primary { background: var(--accent); color: var(--panel); border-color: var(--accent); }
+  .btn-primary:disabled { opacity: .5; cursor: default; }
+  .err { color: var(--danger); min-height: 20px; margin: 0; }
+  .okmsg { color: var(--ok); }
+
+  /* ---------- Layout ---------- */
+  #app { display: none; height: 100%; flex-direction: column; }
+  header { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; padding: 10px 16px;
+    background: var(--panel); border-bottom: 1px solid var(--border); }
+  header h1 { font-size: 16px; margin: 0 12px 0 0; white-space: nowrap; }
+  header .grow { flex: 1; }
+  header label { color: var(--muted); font-size: 12px; display: flex; align-items: center; gap: 6px; }
+  header select { padding: 5px 8px; border: 1px solid var(--border); border-radius: 6px; background: var(--bg); }
+  #main { flex: 1; display: flex; min-height: 0; }
+  #map { flex: 1; min-width: 0; }
+  aside { width: 340px; overflow-y: auto; background: var(--panel); border-left: 1px solid var(--border);
+    padding: 16px; }
+  aside h2 { font-size: 13px; text-transform: uppercase; letter-spacing: .04em; color: var(--muted);
+    margin: 18px 0 8px; }
+  aside h2:first-child { margin-top: 0; }
+  .legend-row { display: flex; align-items: center; gap: 8px; padding: 6px 0; border-bottom: 1px solid var(--border); }
+  .legend-row:last-child { border-bottom: 0; }
+  .sw { width: 14px; height: 14px; border-radius: 3px; flex: none; border: 1px solid rgba(0,0,0,.25); }
+  .legend-row .name { flex: 1; }
+  .legend-row .num { font-variant-numeric: tabular-nums; text-align: right; min-width: 52px; }
+  .legend-head { display: flex; gap: 8px; font-size: 11px; color: var(--muted); padding-bottom: 4px; }
+  .legend-head span:first-child { flex: 1; padding-left: 22px; }
+  .legend-head span { min-width: 52px; text-align: right; }
+  table.mini { width: 100%; border-collapse: collapse; font-variant-numeric: tabular-nums; }
+  table.mini td, table.mini th { padding: 5px 4px; border-bottom: 1px solid var(--border); text-align: right; }
+  table.mini th { color: var(--muted); font-weight: 500; font-size: 12px; }
+  table.mini td:first-child, table.mini th:first-child { text-align: left; }
+  .note { color: var(--muted); font-size: 12px; }
+  .stat-big { font-size: 22px; font-weight: 600; font-variant-numeric: tabular-nums; }
+  .stats { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  .stats div { background: var(--bg); border-radius: 8px; padding: 8px 10px; }
+  .stats .lbl { font-size: 11px; color: var(--muted); }
+  #tieList { max-height: 180px; overflow-y: auto; }
+  #tieList button { display: block; width: 100%; text-align: left; background: none; border: 0;
+    border-bottom: 1px solid var(--border); padding: 6px 2px; }
+  #tieList button:hover { background: var(--bg); }
+
+  /* ---------- Popups ---------- */
+  .leaflet-popup-content { margin: 12px 14px; font-size: 13px; }
+  .pop h3 { margin: 0 0 2px; font-size: 14px; }
+  .pop .sub { color: #6B7280; margin-bottom: 8px; font-size: 12px; }
+  .pop table { border-collapse: collapse; width: 100%; margin: 6px 0; }
+  .pop td { padding: 2px 4px; }
+  .pop td:last-child { text-align: right; font-variant-numeric: tabular-nums; }
+  .pop .op { display: inline-block; padding: 2px 8px; border-radius: 10px; font-weight: 600; font-size: 12px; }
+  .pop .bld { border-top: 1px solid #E5E7EB; padding-top: 6px; margin-top: 6px; }
+  .pop .scroll { max-height: 260px; overflow-y: auto; }
+  .pop .transfer { color: #B91C1C; font-size: 12px; }
+
+  /* ---------- Modal ---------- */
+  .modal-bg { position: fixed; inset: 0; background: rgba(0,0,0,.45); display: none; align-items: center;
+    justify-content: center; z-index: 2000; padding: 16px; }
+  .modal { background: var(--panel); border-radius: 12px; width: 100%; max-width: 560px; max-height: 90vh;
+    overflow-y: auto; padding: 22px; }
+  .modal h2 { margin: 0 0 4px; font-size: 18px; }
+  .modal .row { margin: 14px 0; }
+  .modal .choice { display: flex; gap: 10px; align-items: flex-start; border: 1px solid var(--border);
+    border-radius: 8px; padding: 10px 12px; margin-bottom: 8px; cursor: pointer; }
+  .modal .choice input { margin-top: 3px; }
+  .modal .choice small { display: block; color: var(--muted); }
+  .modal .actions { display: flex; gap: 8px; justify-content: flex-end; margin-top: 18px; flex-wrap: wrap; }
+  .modal .preview { background: var(--bg); border-radius: 8px; padding: 10px 12px; font-size: 13px; }
+  .modal ul { margin: 6px 0 0; padding-left: 18px; color: var(--danger); font-size: 12px; }
+
+  #loading { position: fixed; inset: 0; display: none; align-items: center; justify-content: center;
+    background: rgba(0,0,0,.25); z-index: 2500; color: #fff; font-weight: 600; }
+  #loading div { background: rgba(17,24,39,.9); padding: 14px 22px; border-radius: 10px; }
+
+  #panelToggle { display: none; }
+  @media (max-width: 800px) {
+    #main { flex-direction: column; }
+    aside { width: 100%; max-height: 45%; border-left: 0; border-top: 1px solid var(--border); }
+    aside.hidden { display: none; }
+    #panelToggle { display: inline-block; }
+    .map-legend { display: none; }
+    header h1 { width: 100%; }
+  }
+</style>
+</head>
+<body>
+
+<!-- ============ LOGIN ============ -->
+<div id="login">
+  <form id="loginForm" autocomplete="off">
+    <h1>ISP Confluence Map</h1>
+    <p>iON Network · Satellite Netcom · Nettvox</p>
+    <input id="pwd" type="password" placeholder="Password" required autofocus>
+    <p class="err" id="loginErr"></p>
+    <button class="btn btn-primary" style="width:100%" id="loginBtn">Sign in</button>
+  </form>
+</div>
+
+<!-- ============ APP ============ -->
+<div id="app">
+  <header>
+    <h1>ISP Confluence Map</h1>
+    <label>City <select id="fCity"><option value="">All</option></select></label>
+    <label>Area <select id="fArea"><option value="">All</option></select></label>
+    <label>Zone size
+      <select id="fZone">
+        <option value="250">250 m</option>
+        <option value="500" selected>500 m</option>
+        <option value="1000">1 km</option>
+        <option value="2000">2 km</option>
+      </select>
+    </label>
+    <label><input type="checkbox" id="tZones" checked> Zones</label>
+    <label><input type="checkbox" id="tBld" checked> Buildings</label>
+    <span class="grow"></span>
+    <button class="btn" id="panelToggle">Summary</button>
+    <button class="btn" id="btnExport">Export Excel</button>
+    <button class="btn btn-primary" id="btnUpload">Upload data</button>
+    <button class="btn" id="btnLogout" title="Sign out">Sign out</button>
+  </header>
+  <div id="main">
+    <div id="map"></div>
+    <aside id="panel">
+      <h2>Zone operator (by subscriber volume)</h2>
+      <div class="legend-head"><span>Operator</span><span>Zones</span><span>Bldgs</span><span>Subs</span></div>
+      <div id="legend"></div>
+      <p class="note" style="margin-top:8px">Each hexagon zone goes to the ISP with the most subscribers in it. Every building in the zone is operated by that ISP.</p>
+
+      <h2>Transfers needed</h2>
+      <div class="stats">
+        <div><div class="lbl">Buildings to transfer</div><div class="stat-big" id="sBld">–</div></div>
+        <div><div class="lbl">Subscribers to migrate</div><div class="stat-big" id="sSubs">–</div></div>
+      </div>
+      <table class="mini" style="margin-top:10px">
+        <thead><tr><th>From → To</th><th>Bldgs</th><th>Subs</th></tr></thead>
+        <tbody id="transferTbl"></tbody>
+      </table>
+
+      <h2>Tied zones – review <span id="tieCount"></span></h2>
+      <div id="tieList"></div>
+
+      <h2>Data</h2>
+      <p class="note" id="dataInfo"></p>
+    </aside>
+  </div>
+</div>
+
+<!-- ============ UPLOAD MODAL ============ -->
+<div class="modal-bg" id="uploadModal">
+  <div class="modal">
+    <h2>Upload data from Excel</h2>
+    <p class="note">Accepted: .xlsx, .xls, .csv. The first sheet is read. Required column: <b>Building Name</b>. Recognised columns: Building Name, Area, City, Latitude, Longitude, iON Network, Nettvox, Satellite Netcom, Location Verified.</p>
+    <div class="row">
+      <input type="file" id="fileIn" accept=".xlsx,.xls,.csv">
+      <button class="btn" id="btnTemplate" style="margin-left:6px">Download template</button>
+    </div>
+    <div class="row preview" id="preview" style="display:none"></div>
+    <div class="row">
+      <label class="choice"><input type="radio" name="mode" value="merge" checked>
+        <span><b>Update + add</b><small>Rows are matched on Building Name + Area + City. Matches get updated, new buildings get added, and nothing is deleted. Blank lat/long cells keep the existing values.</small></span></label>
+      <label class="choice"><input type="radio" name="mode" value="replace">
+        <span><b>Replace everything</b><small>The current sheet is copied to a "Backup …" tab, then fully replaced by this file.</small></span></label>
+    </div>
+    <p class="err" id="upErr"></p>
+    <div class="actions">
+      <button class="btn" id="btnCancel">Cancel</button>
+      <button class="btn btn-primary" id="btnDoUpload" disabled>Upload</button>
+    </div>
+  </div>
+</div>
+
+<div id="loading"><div id="loadingText">Loading…</div></div>
+
+<script>
+/* =====================================================================
+   CONFIG — paste your Apps Script Web App URL here (ends with /exec)
+   ===================================================================== */
+const API_URL = 'PASTE_YOUR_APPS_SCRIPT_WEB_APP_URL_HERE';
+
+/* ===================================================================== */
+const ISPS = [
+  { key: 'ION',     label: 'iON Network',      col: 5, color: '#F97316' },
+  { key: 'NETCOM',  label: 'Satellite Netcom', col: 7, color: '#2563EB' },
+  { key: 'NETTVOX', label: 'Nettvox',          col: 6, color: '#FACC15' },
+];
+const TIE = { key: 'TIE', label: 'Tie – review', color: '#9CA3AF' };
+const BY_KEY = Object.fromEntries([...ISPS, TIE].map(i => [i.key, i]));
+const HEADERS = ['Building Name','Area','City','Latitude','Longitude','iON Network','Nettvox','Satellite Netcom','Location Verified'];
+
+let password = '';
+let buildings = [];   // {name, area, city, lat, lng, subs:{ION,NETTVOX,NETCOM}, verified, zoneId, operator}
+let zones = new Map();// id -> {id, q, r, center:[lat,lng], poly:[[lat,lng]...], subs:{}, bIdx:[], operator}
+let lastUpdated = '';
+let map, zoneLayer, bldLayer, canvas;
+
+/* ---------- storage helpers (never required) ---------- */
+const store = {
+  get(k) { try { return sessionStorage.getItem(k); } catch { return null; } },
+  set(k, v) { try { sessionStorage.setItem(k, v); } catch {} },
+  del(k) { try { sessionStorage.removeItem(k); } catch {} },
+};
+
+/* ---------- API ---------- */
+async function api(action, extra = {}) {
+  if (API_URL.startsWith('PASTE_')) throw new Error('API_URL is not set in index.html.');
+  const res = await fetch(API_URL, {
+    method: 'POST',
+    headers: { 'Content-Type': 'text/plain;charset=utf-8' }, // avoids CORS pre-flight
+    body: JSON.stringify({ action, password, ...extra }),
+    redirect: 'follow',
+  });
+  const data = await res.json();
+  if (data.auth === false) { logout(data.error); throw new Error(data.error); }
+  if (!data.ok) { const e = new Error(data.error || 'Request failed'); e.data = data; throw e; }
+  return data;
+}
+
+function busy(on, text = 'Loading…') {
+  document.getElementById('loadingText').textContent = text;
+  document.getElementById('loading').style.display = on ? 'flex' : 'none';
+}
+
+/* ---------- Login ---------- */
+document.getElementById('loginForm').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  password = document.getElementById('pwd').value;
+  const btn = document.getElementById('loginBtn'), err = document.getElementById('loginErr');
+  btn.disabled = true; err.textContent = '';
+  try {
+    await api('login');
+    store.set('icm_pwd', password);
+    await start();
+  } catch (ex) { err.textContent = ex.message; }
+  btn.disabled = false;
+});
+
+function logout(msg) {
+  password = ''; store.del('icm_pwd');
+  document.getElementById('app').style.display = 'none';
+  document.getElementById('login').style.display = 'flex';
+  document.getElementById('loginErr').textContent = msg || '';
+  document.getElementById('pwd').value = '';
+}
+document.getElementById('btnLogout').onclick = () => logout();
+
+async function start() {
+  document.getElementById('login').style.display = 'none';
+  document.getElementById('app').style.display = 'flex';
+  if (!map) initMap();
+  await loadData();
+}
+
+/* ---------- Map ---------- */
+function initMap() {
+  canvas = L.canvas({ padding: 0.5 });
+  map = L.map('map', { preferCanvas: true }).setView([19.09, 72.91], 13);
+  // Free basemaps – no API key needed
+  const light = L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
+    maxZoom: 20, subdomains: 'abcd',
+    attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="https://carto.com/attributions">CARTO</a>'
+  });
+  const osm = L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    maxZoom: 19, attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
+  });
+  const sat = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+    maxZoom: 19, attribution: 'Imagery &copy; Esri'
+  });
+  light.addTo(map);
+  L.control.layers({ 'Light': light, 'Streets (OSM)': osm, 'Satellite (Esri)': sat }, null, { position: 'topleft' }).addTo(map);
+  L.control.scale({ imperial: false }).addTo(map);
+  zoneLayer = L.layerGroup().addTo(map);
+  bldLayer = L.layerGroup().addTo(map);
+
+  const legend = L.control({ position: 'bottomleft' });
+  legend.onAdd = () => {
+    const d = L.DomUtil.create('div', 'map-legend');
+    d.style.cssText = 'background:#fff;color:#111;padding:8px 10px;border-radius:8px;box-shadow:0 1px 4px rgba(0,0,0,.3);font-size:12px;line-height:1.7';
+    d.innerHTML = [...ISPS, TIE].map(i =>
+      `<div><span style="display:inline-block;width:12px;height:12px;border-radius:2px;background:${i.color};border:1px solid rgba(0,0,0,.3);vertical-align:-2px;margin-right:6px"></span>${i.label}</div>`).join('');
+    return d;
+  };
+  legend.addTo(map);
+}
+
+async function loadData() {
+  busy(true, 'Loading data from Google Sheet…');
+  try {
+    const d = await api('getData');
+    lastUpdated = d.lastUpdated;
+    buildings = d.rows.map(r => ({
+      name: r[0], area: r[1], city: r[2],
+      lat: typeof r[3] === 'number' ? r[3] : NaN, lng: typeof r[4] === 'number' ? r[4] : NaN,
+      subs: { ION: +r[5] || 0, NETTVOX: +r[6] || 0, NETCOM: +r[7] || 0 },
+      verified: r[8],
+    }));
+    fillFilters();
+    computeZones();
+    render(true);
+  } catch (ex) {
+    if (password) alert('Could not load data: ' + ex.message);
+  } finally { busy(false); }
+}
+
+/* ---------- Filters ---------- */
+function fillFilters() {
+  const fc = document.getElementById('fCity'), cur = fc.value;
+  const cities = [...new Set(buildings.map(b => b.city).filter(Boolean))].sort();
+  fc.innerHTML = '<option value="">All</option>' + cities.map(c => `<option>${esc(c)}</option>`).join('');
+  if (cities.includes(cur)) fc.value = cur;
+  fillAreas();
+}
+function fillAreas() {
+  const city = document.getElementById('fCity').value;
+  const fa = document.getElementById('fArea'), cur = fa.value;
+  const areas = [...new Set(buildings.filter(b => !city || b.city === city).map(b => b.area).filter(Boolean))].sort();
+  fa.innerHTML = '<option value="">All</option>' + areas.map(a => `<option>${esc(a)}</option>`).join('');
+  if (areas.includes(cur)) fa.value = cur;
+}
+const inFilter = b => {
+  const c = document.getElementById('fCity').value, a = document.getElementById('fArea').value;
+  return (!c || b.city === c) && (!a || b.area === a);
+};
+document.getElementById('fCity').onchange = () => { fillAreas(); render(true); };
+document.getElementById('fArea').onchange = () => render(true);
+document.getElementById('fZone').onchange = () => { computeZones(); render(false); };
+document.getElementById('tZones').onchange = () => render(false);
+document.getElementById('tBld').onchange = () => render(false);
+document.getElementById('panelToggle').onclick = () => document.getElementById('panel').classList.toggle('hidden');
+
+/* ---------- Zone engine (hexagon grid) ----------
+   Buildings are projected to metres around a fixed origin and binned into
+   pointy-top hexagons whose flat-to-flat width = chosen zone size.
+   The zone operator is the ISP with the highest TOTAL subscribers in the zone.
+   Equal top totals = TIE (grey, needs manual review). */
+const ORIGIN = { lat: 19.0, lng: 72.8 };      // fixed so zone IDs stay stable between loads
+const M_PER_DEG_LAT = 110574;
+const M_PER_DEG_LNG = 111320 * Math.cos(ORIGIN.lat * Math.PI / 180);
+const toXY = (lat, lng) => [(lng - ORIGIN.lng) * M_PER_DEG_LNG, (lat - ORIGIN.lat) * M_PER_DEG_LAT];
+const toLL = (x, y) => [ORIGIN.lat + y / M_PER_DEG_LAT, ORIGIN.lng + x / M_PER_DEG_LNG];
+
+function hexRound(q, r) {
+  let x = q, z = r, y = -x - z;
+  let rx = Math.round(x), ry = Math.round(y), rz = Math.round(z);
+  const dx = Math.abs(rx - x), dy = Math.abs(ry - y), dz = Math.abs(rz - z);
+  if (dx > dy && dx > dz) rx = -ry - rz; else if (dy > dz) ry = -rx - rz; else rz = -rx - ry;
+  return [rx, rz];
+}
+
+function winner(subs) {
+  let best = -1, keys = [];
+  for (const i of ISPS) {
+    const v = subs[i.key] || 0;
+    if (v > best) { best = v; keys = [i.key]; } else if (v === best) keys.push(i.key);
+  }
+  if (best <= 0) return null;
+  return keys.length > 1 ? 'TIE' : keys[0];
+}
+
+function computeZones() {
+  const width = +document.getElementById('fZone').value;
+  const s = width / Math.sqrt(3);        // hex circumradius
+  zones = new Map();
+  buildings.forEach((b, i) => {
+    b.zoneId = null; b.operator = null;
+    if (!isFinite(b.lat) || !isFinite(b.lng)) return;
+    const [x, y] = toXY(b.lat, b.lng);
+    const qf = (Math.sqrt(3) / 3 * x - y / 3) / s, rf = (2 / 3 * y) / s;
+    const [q, r] = hexRound(qf, rf);
+    const id = `${q},${r}`;
+    let z = zones.get(id);
+    if (!z) {
+      const cx = s * Math.sqrt(3) * (q + r / 2), cy = s * 1.5 * r;
+      const poly = [];
+      for (let k = 0; k < 6; k++) {
+        const a = Math.PI / 180 * (60 * k - 30);
+        poly.push(toLL(cx + s * Math.cos(a), cy + s * Math.sin(a)));
+      }
+      z = { id, q, r, center: toLL(cx, cy), poly, subs: { ION: 0, NETTVOX: 0, NETCOM: 0 }, bIdx: [] };
+      zones.set(id, z);
+    }
+    z.bIdx.push(i);
+    for (const k in b.subs) z.subs[k] += b.subs[k];
+    b.zoneId = id;
+  });
+  // Friendly zone codes (Z-001…) ordered north→south, west→east
+  [...zones.values()].sort((a, b) => b.center[0] - a.center[0] || a.center[1] - b.center[1])
+    .forEach((z, n) => { z.code = 'Z-' + String(n + 1).padStart(3, '0'); });
+  for (const z of zones.values()) {
+    z.operator = winner(z.subs);
+    for (const i of z.bIdx) buildings[i].operator = z.operator;
+  }
+}
+
+/* ---------- Render ---------- */
+function render(fit) {
+  zoneLayer.clearLayers(); bldLayer.clearLayers();
+  const vis = buildings.filter(b => inFilter(b) && b.zoneId);
+  const visZones = new Set(vis.map(b => b.zoneId));
+
+  if (document.getElementById('tZones').checked) {
+    for (const id of visZones) {
+      const z = zones.get(id), c = BY_KEY[z.operator || 'TIE'].color;
+      L.polygon(z.poly, { renderer: canvas, color: shade(c, -0.25), weight: 1, fillColor: c, fillOpacity: 0.38 })
+        .bindPopup(() => zonePopup(z), { maxWidth: 320 })
+        .addTo(zoneLayer);
+    }
+  }
+
+  if (document.getElementById('tBld').checked) {
+    // Group buildings sharing exact coordinates into one marker
+    const groups = new Map();
+    vis.forEach(b => {
+      const k = b.lat.toFixed(6) + ',' + b.lng.toFixed(6);
+      (groups.get(k) || groups.set(k, []).get(k)).push(b);
+    });
+    for (const list of groups.values()) {
+      const tot = list.reduce((s, b) => s + total(b), 0);
+      const op = list[0].operator || 'TIE';
+      const r = Math.max(3.5, Math.min(11, 2.5 + Math.sqrt(tot) * 0.9));
+      L.circleMarker([list[0].lat, list[0].lng], {
+        renderer: canvas, radius: r, weight: 1.2, color: '#111827',
+        fillColor: BY_KEY[op].color, fillOpacity: 0.95
+      }).bindPopup(() => bldPopup(list), { maxWidth: 340 }).addTo(bldLayer);
+    }
+  }
+
+  if (fit && vis.length) map.fitBounds(L.latLngBounds(vis.map(b => [b.lat, b.lng])).pad(0.05));
+  renderSummary(vis, visZones);
+}
+
+function renderSummary(vis, visZones) {
+  const agg = {};
+  [...ISPS, TIE].forEach(i => agg[i.key] = { zones: 0, bld: 0, subs: 0 });
+  for (const id of visZones) agg[zones.get(id).operator || 'TIE'].zones++;
+  vis.forEach(b => { const a = agg[b.operator || 'TIE']; a.bld++; a.subs += total(b); });
+  document.getElementById('legend').innerHTML = [...ISPS, TIE].map(i => `
+    <div class="legend-row"><span class="sw" style="background:${i.color}"></span>
+      <span class="name">${i.label}</span>
+      <span class="num">${fmt(agg[i.key].zones)}</span><span class="num">${fmt(agg[i.key].bld)}</span>
+      <span class="num">${fmt(agg[i.key].subs)}</span></div>`).join('');
+
+  // Transfers: in each building, subscribers of non-operator ISPs move to the zone operator
+  const t = {}; let tb = 0, ts = 0;
+  vis.forEach(b => {
+    if (!b.operator || b.operator === 'TIE') return;
+    let moved = false;
+    for (const i of ISPS) {
+      if (i.key === b.operator || !b.subs[i.key]) continue;
+      const k = i.key + '>' + b.operator;
+      t[k] = t[k] || { bld: 0, subs: 0 };
+      t[k].bld++; t[k].subs += b.subs[i.key]; ts += b.subs[i.key]; moved = true;
+    }
+    if (moved) tb++;
+  });
+  document.getElementById('sBld').textContent = fmt(tb);
+  document.getElementById('sSubs').textContent = fmt(ts);
+  const rows = Object.entries(t).sort((a, b) => b[1].subs - a[1].subs);
+  document.getElementById('transferTbl').innerHTML = rows.length ? rows.map(([k, v]) => {
+    const [f, to] = k.split('>');
+    return `<tr><td><span class="sw" style="display:inline-block;vertical-align:-2px;background:${BY_KEY[f].color}"></span> ${short(f)} → <span class="sw" style="display:inline-block;vertical-align:-2px;background:${BY_KEY[to].color}"></span> ${short(to)}</td><td>${fmt(v.bld)}</td><td>${fmt(v.subs)}</td></tr>`;
+  }).join('') : '<tr><td colspan="3" class="note">No transfers</td></tr>';
+
+  const ties = [...visZones].map(id => zones.get(id)).filter(z => z.operator === 'TIE')
+    .sort((a, b) => a.code.localeCompare(b.code));
+  document.getElementById('tieCount').textContent = `(${ties.length})`;
+  document.getElementById('tieList').innerHTML = ties.length ? ties.map(z =>
+    `<button data-z="${z.id}">${z.code} — ${ISPS.map(i => short(i.key) + ' ' + z.subs[i.key]).join(' · ')}</button>`).join('')
+    : '<p class="note">No tied zones.</p>';
+  document.querySelectorAll('#tieList button').forEach(btn => btn.onclick = () => {
+    const z = zones.get(btn.dataset.z);
+    map.fitBounds(L.latLngBounds(z.poly).pad(0.6));
+    L.popup({ maxWidth: 320 }).setLatLng(z.center).setContent(zonePopup(z)).openOn(map);
+  });
+
+  const missing = buildings.filter(b => !b.zoneId && inFilter(b)).length;
+  document.getElementById('dataInfo').innerHTML =
+    `${fmt(vis.length)} buildings shown in ${fmt(visZones.size)} zones.` +
+    (missing ? ` <b>${fmt(missing)}</b> buildings have no lat/long and are left off the map.` : '') +
+    (lastUpdated ? `<br>Last upload: ${esc(lastUpdated)}` : '');
+}
+
+function zonePopup(z) {
+  const op = z.operator || 'TIE';
+  const list = z.bIdx.map(i => buildings[i]).sort((a, b) => total(b) - total(a));
+  return `<div class="pop"><h3>Zone ${z.code}</h3>
+    <div class="sub">${list.length} buildings · ${fmt(sum(z.subs))} subscribers</div>
+    ${subsTable(z.subs, op)}
+    <div>Operator: ${badge(op)}</div>
+    <div class="bld scroll"><b style="font-size:12px">Buildings</b>
+      ${list.slice(0, 40).map(b => `<div style="font-size:12px">${esc(b.name)} <span style="color:#6B7280">(${ISPS.map(i => b.subs[i.key]).join('/')})</span></div>`).join('')}
+      ${list.length > 40 ? `<div class="note">+${list.length - 40} more</div>` : ''}
+      <div style="font-size:11px;color:#6B7280;margin-top:4px">Counts shown as iON / Netcom / Nettvox</div>
+    </div></div>`;
+}
+
+function bldPopup(list) {
+  return `<div class="pop scroll">${list.map((b, n) => {
+    const op = b.operator || 'TIE', z = zones.get(b.zoneId);
+    const moves = op === 'TIE' ? [] : ISPS.filter(i => i.key !== op && b.subs[i.key] > 0)
+      .map(i => `${b.subs[i.key]} ${i.label} → ${BY_KEY[op].label}`);
+    return `<div class="${n ? 'bld' : ''}"><h3>${esc(b.name)}</h3>
+      <div class="sub">${esc(b.area)}, ${esc(b.city)} · Zone ${z.code}${b.verified ? ' · Location: ' + esc(b.verified) : ''}</div>
+      ${subsTable(b.subs, winner(b.subs))}
+      <div>Operated by: ${badge(op)}</div>
+      ${op === 'TIE' ? '<div class="transfer">Zone is tied — needs manual decision</div>' : ''}
+      ${moves.map(m => `<div class="transfer">Transfer: ${m}</div>`).join('')}
+    </div>`;
+  }).join('')}</div>`;
+}
+
+function subsTable(subs, lead) {
+  return `<table>${ISPS.map(i => `<tr style="${i.key === lead ? 'font-weight:700' : ''}">
+    <td><span style="display:inline-block;width:10px;height:10px;border-radius:2px;background:${i.color};margin-right:6px;border:1px solid rgba(0,0,0,.3)"></span>${i.label}</td>
+    <td>${fmt(subs[i.key] || 0)}</td></tr>`).join('')}</table>`;
+}
+const badge = k => `<span class="op" style="background:${BY_KEY[k].color};color:${k === 'NETCOM' ? '#fff' : '#111'}">${BY_KEY[k].label}</span>`;
+
+/* ---------- Export ---------- */
+document.getElementById('btnExport').onclick = () => {
+  const vis = buildings.filter(inFilter);
+  const bRows = vis.map(b => {
+    const z = zones.get(b.zoneId), op = b.operator || (b.zoneId ? 'TIE' : '');
+    const moves = (!op || op === 'TIE') ? '' : ISPS.filter(i => i.key !== op && b.subs[i.key] > 0)
+      .map(i => `${b.subs[i.key]} from ${i.label}`).join('; ');
+    return {
+      'Building Name': b.name, 'Area': b.area, 'City': b.city,
+      'Latitude': isFinite(b.lat) ? b.lat : '', 'Longitude': isFinite(b.lng) ? b.lng : '',
+      'iON Network': b.subs.ION, 'Nettvox': b.subs.NETTVOX, 'Satellite Netcom': b.subs.NETCOM,
+      'Total Subscribers': total(b),
+      'Building Leader': BY_KEY[winner(b.subs) || 'TIE']?.label || '',
+      'Zone': z ? z.code : 'No location',
+      'Zone Operator': op ? BY_KEY[op].label : '',
+      'Subscribers to Transfer In': moves,
+    };
+  });
+  const zIds = new Set(vis.map(b => b.zoneId).filter(Boolean));
+  const zRows = [...zIds].map(id => zones.get(id)).sort((a, b) => a.code.localeCompare(b.code)).map(z => ({
+    'Zone': z.code, 'Centre Lat': +z.center[0].toFixed(6), 'Centre Lng': +z.center[1].toFixed(6),
+    'Buildings': z.bIdx.length, 'iON Network': z.subs.ION, 'Nettvox': z.subs.NETTVOX,
+    'Satellite Netcom': z.subs.NETCOM, 'Operator': BY_KEY[z.operator || 'TIE'].label,
+  }));
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(bRows), 'Building Assignment');
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(zRows), 'Zone Summary');
+  XLSX.writeFile(wb, `ISP_Demarcation_${document.getElementById('fZone').value}m_${new Date().toISOString().slice(0, 10)}.xlsx`);
+};
+
+/* ---------- Upload ---------- */
+let parsedRows = null;
+const modal = document.getElementById('uploadModal');
+document.getElementById('btnUpload').onclick = () => {
+  parsedRows = null; document.getElementById('fileIn').value = '';
+  document.getElementById('preview').style.display = 'none';
+  document.getElementById('upErr').textContent = '';
+  document.getElementById('btnDoUpload').disabled = true;
+  modal.style.display = 'flex';
+};
+document.getElementById('btnCancel').onclick = () => modal.style.display = 'none';
+modal.addEventListener('click', e => { if (e.target === modal) modal.style.display = 'none'; });
+
+document.getElementById('btnTemplate').onclick = () => {
+  const ws = XLSX.utils.aoa_to_sheet([HEADERS,
+    ['Example Tower', 'Ghatkopar West', 'Mumbai', 19.096919, 72.913613, 10, 68, 0, 'Yes']]);
+  ws['!cols'] = HEADERS.map(() => ({ wch: 16 }));
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'Data');
+  XLSX.writeFile(wb, 'ISP_Confluence_Upload_Template.xlsx');
+};
+
+// Column name matching is forgiving (case, spaces, common short names)
+const ALIASES = {
+  0: ['building name', 'building', 'name', 'society', 'building/society'],
+  1: ['area', 'locality', 'location'],
+  2: ['city'],
+  3: ['latitude', 'lat'],
+  4: ['longitude', 'long', 'lng', 'lon'],
+  5: ['ion network', 'ion', 'ion subscribers'],
+  6: ['nettvox', 'nettvox subscribers', 'netvox'],
+  7: ['satellite netcom', 'netcom', 'satellite netcom subscribers', 'sat netcom'],
+  8: ['location verified', 'verified'],
+};
+const norm = s => String(s ?? '').toLowerCase().replace(/[^a-z0-9/]+/g, ' ').trim();
+
+document.getElementById('fileIn').onchange = async (e) => {
+  const f = e.target.files[0], pv = document.getElementById('preview'), err = document.getElementById('upErr');
+  parsedRows = null; err.textContent = ''; document.getElementById('btnDoUpload').disabled = true;
+  if (!f) return;
+  try {
+    const wb = XLSX.read(await f.arrayBuffer(), { type: 'array' });
+    const aoa = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], { header: 1, defval: '', raw: true });
+    if (aoa.length < 2) throw new Error('The first sheet has no data rows.');
+    const head = aoa[0].map(norm), map = {}, found = [];
+    for (const [idx, names] of Object.entries(ALIASES)) {
+      const c = head.findIndex(h => names.includes(h));
+      if (c >= 0) { map[idx] = c; found.push(HEADERS[idx]); }
+    }
+    if (map[0] === undefined) throw new Error('Column "Building Name" not found in the first row.');
+    const rows = [], problems = [];
+    aoa.slice(1).forEach((r, n) => {
+      if (r.every(v => String(v).trim() === '')) return;
+      const out = HEADERS.map((_, i) => map[i] === undefined ? '' : r[map[i]]);
+      if (!String(out[0]).trim()) { problems.push(`Row ${n + 2}: Building Name empty`); return; }
+      for (const i of [5, 6, 7]) {
+        const v = String(out[i]).trim();
+        if (v !== '' && !(Number.isInteger(+v) && +v >= 0)) problems.push(`Row ${n + 2}: ${HEADERS[i]} "${v}" is not a whole number`);
+      }
+      for (const i of [3, 4]) {
+        const v = String(out[i]).trim();
+        if (v !== '' && !isFinite(+v)) problems.push(`Row ${n + 2}: ${HEADERS[i]} "${v}" is not a number`);
+      }
+      rows.push(out);
+    });
+    const missing = HEADERS.filter(h => !found.includes(h));
+    pv.innerHTML = `<b>${esc(f.name)}</b> — ${fmt(rows.length)} rows read from sheet "${esc(wb.SheetNames[0])}".<br>
+      Columns found: ${found.map(esc).join(', ')}.
+      ${missing.length ? `<br><span style="color:var(--muted)">Not in file (left blank / kept): ${missing.map(esc).join(', ')}</span>` : ''}
+      ${problems.length ? `<ul>${problems.slice(0, 10).map(p => `<li>${esc(p)}</li>`).join('')}${problems.length > 10 ? `<li>…and ${problems.length - 10} more</li>` : ''}</ul>
+        <div style="margin-top:6px">Rows with problems will be skipped by the server.</div>` : '<div class="okmsg" style="margin-top:6px">No problems found.</div>'}`;
+    pv.style.display = 'block';
+    parsedRows = rows;
+    document.getElementById('btnDoUpload').disabled = rows.length === 0;
+  } catch (ex) { err.textContent = 'Could not read file: ' + ex.message; pv.style.display = 'none'; }
+};
+
+document.getElementById('btnDoUpload').onclick = async () => {
+  if (!parsedRows) return;
+  const mode = document.querySelector('input[name=mode]:checked').value;
+  if (mode === 'replace' && !confirm(`Replace ALL data in the sheet with ${parsedRows.length} rows from this file?\nA backup tab is created first.`)) return;
+  const err = document.getElementById('upErr'); err.textContent = '';
+  busy(true, 'Uploading to Google Sheet…');
+  try {
+    const r = await api('upload', { mode, rows: parsedRows });
+    modal.style.display = 'none';
+    busy(false);
+    alert(`Upload complete.\nAdded: ${r.added}\nUpdated: ${r.updated}\nSkipped: ${r.skipped}` +
+      (r.backup ? `\nBackup tab: ${r.backup}` : '') +
+      (r.errors && r.errors.length ? `\n\nFirst problems:\n${r.errors.slice(0, 5).join('\n')}` : ''));
+    await loadData();
+  } catch (ex) {
+    busy(false);
+    err.textContent = 'Upload failed: ' + ex.message;
+  }
+};
+
+/* ---------- utils ---------- */
+function total(b) { return b.subs.ION + b.subs.NETTVOX + b.subs.NETCOM; }
+function sum(o) { return Object.values(o).reduce((a, b) => a + b, 0); }
+function fmt(n) { return Number(n).toLocaleString('en-IN'); }
+function short(k) { return { ION: 'iON', NETCOM: 'Netcom', NETTVOX: 'Nettvox', TIE: 'Tie' }[k]; }
+function esc(s) { return String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c])); }
+function shade(hex, p) {
+  const n = parseInt(hex.slice(1), 16), f = v => Math.max(0, Math.min(255, Math.round(v * (1 + p))));
+  return '#' + [n >> 16, (n >> 8) & 255, n & 255].map(f).map(v => v.toString(16).padStart(2, '0')).join('');
+}
+
+/* ---------- auto sign-in within the same browser tab session ---------- */
+(async () => {
+  const saved = store.get('icm_pwd');
+  if (saved) {
+    password = saved;
+    try { await api('login'); await start(); } catch { logout(); }
+  }
+})();
+</script>
+</body>
+</html>
