@@ -217,6 +217,8 @@
    CONFIG — paste your Apps Script Web App URL here (ends with /exec)
    ===================================================================== */
 const API_URL = 'https://script.google.com/macros/s/AKfycbzy0LyhmvUpL9eEWlSmks6lz1D12b6G8ghhSq8bhPBY9Wmv4C72dVighiotvabcBoQxyg/exec';
+// Optional. Leave '' to use only free, key-less OpenStreetMap maps.
+const CARTO_KEY = '';
 
 /* ===================================================================== */
 const ISPS = [
@@ -295,19 +297,26 @@ async function start() {
 function initMap() {
   canvas = L.canvas({ padding: 0.5 });
   map = L.map('map', { preferCanvas: true }).setView([19.09, 72.91], 13);
-  // Free basemaps – no API key needed
-  const light = L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
-    maxZoom: 20, subdomains: 'abcd',
-    attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="https://carto.com/attributions">CARTO</a>'
-  });
-  const osm = L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
-    maxZoom: 19, attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
-  });
-  const sat = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
-    maxZoom: 19, attribution: 'Imagery &copy; Esri'
-  });
-  light.addTo(map);
-  L.control.layers({ 'Light': light, 'Streets (OSM)': osm, 'Satellite (Esri)': sat }, null, { position: 'topleft' }).addTo(map);
+  // Free basemaps – NO API key needed (OpenStreetMap)
+  const OSM_ATTR = '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors';
+  const bases = {
+    'Streets (OpenStreetMap)': L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      maxZoom: 19, attribution: OSM_ATTR }),
+    'Humanitarian (OSM)': L.tileLayer('https://{s}.tile.openstreetmap.fr/hot/{z}/{x}/{y}.png', {
+      maxZoom: 19, subdomains: 'abc', attribution: OSM_ATTR + ', tiles by <a href="https://www.hotosm.org/">HOT</a>' }),
+    'Satellite (Esri)': L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+      maxZoom: 19, attribution: 'Imagery &copy; Esri' }),
+  };
+  // Optional: CARTO "Light" style needs a FREE key (no account, 5M tiles/month): carto.com/basemaps/apikey
+  if (CARTO_KEY) {
+    bases['Light (CARTO)'] = L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/light_all/{z}/{x}/{y}{r}.png?key=' + encodeURIComponent(CARTO_KEY), {
+      maxZoom: 20, subdomains: 'abcd',
+      attribution: OSM_ATTR + ' &copy; <a href="https://carto.com/attributions">CARTO</a>' });
+  }
+  let saved = null; try { saved = localStorage.getItem('icm_base'); } catch {}
+  (bases[saved] || bases['Streets (OpenStreetMap)']).addTo(map);
+  map.on('baselayerchange', e => { try { localStorage.setItem('icm_base', e.name); } catch {} });
+  L.control.layers(bases, null, { position: 'topleft' }).addTo(map);
   L.control.scale({ imperial: false }).addTo(map);
   zoneLayer = L.layerGroup().addTo(map);
   bldLayer = L.layerGroup().addTo(map);
